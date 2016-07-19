@@ -7,8 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1F560D9A1D3D3BD700047B10 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F560D991D3D3BD700047B10 /* main.cpp */; };
+		1F560D9A1D3D3BD700047B10 /* fmt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F560D991D3D3BD700047B10 /* fmt.cpp */; };
 		1F560D9C1D3D3BD700047B10 /* FMT.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1F560D9B1D3D3BD700047B10 /* FMT.1 */; };
+		1F560DA41D3D568000047B10 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F560DA31D3D568000047B10 /* main.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,8 +27,10 @@
 
 /* Begin PBXFileReference section */
 		1F560D961D3D3BD700047B10 /* FMT */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = FMT; sourceTree = BUILT_PRODUCTS_DIR; };
-		1F560D991D3D3BD700047B10 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		1F560D991D3D3BD700047B10 /* fmt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = fmt.cpp; sourceTree = "<group>"; };
 		1F560D9B1D3D3BD700047B10 /* FMT.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = FMT.1; sourceTree = "<group>"; };
+		1F560DA21D3D3BE900047B10 /* fmt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fmt.h; sourceTree = "<group>"; };
+		1F560DA31D3D568000047B10 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,7 +63,9 @@
 		1F560D981D3D3BD700047B10 /* FMT */ = {
 			isa = PBXGroup;
 			children = (
-				1F560D991D3D3BD700047B10 /* main.cpp */,
+				1F560D991D3D3BD700047B10 /* fmt.cpp */,
+				1F560DA31D3D568000047B10 /* main.cpp */,
+				1F560DA21D3D3BE900047B10 /* fmt.h */,
 				1F560D9B1D3D3BD700047B10 /* FMT.1 */,
 			);
 			path = FMT;
@@ -117,7 +122,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1F560D9A1D3D3BD700047B10 /* main.cpp in Sources */,
+				1F560DA41D3D568000047B10 /* main.cpp in Sources */,
+				1F560D9A1D3D3BD700047B10 /* fmt.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -144,7 +150,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
-				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_OPTIMIZATION_LEVEL = 3;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
 					"$(inherited)",
@@ -183,6 +189,7 @@
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_OPTIMIZATION_LEVEL = 3;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -204,6 +211,7 @@
 		1F560DA11D3D3BD700047B10 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"OTHER_CPLUSPLUSFLAGS[arch=*]" = "$(OTHER_CFLAGS)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

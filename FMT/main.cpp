@@ -6,13 +6,38 @@
 //  Copyright (c) 2016 ASL. All rights reserved.
 //
 
-#include <iostream>
+#include <stdio.h>
+#include <chrono>
+#include "fmt.h"
 
-int main(int argc, const char * argv[])
-{
+#ifndef FMT_TIMING
+typedef std::chrono::high_resolution_clock::time_point TimeVar;
+#define duration(a) std::chrono::duration_cast<std::chrono::nanoseconds>(a).count()
+#define timeNow() std::chrono::high_resolution_clock::now()
 
-    // insert code here...
-    std::cout << "Hello, World!\n";
+#endif
+
+int main(){
+//    TimeVar t1 = timeNow();
+    FMT F = FMT(100,100,0,5000,RAD_CON, 10, 5);
+//    double time = duration(timeNow()-t1);
+//    std::cout<<"Initialization time: "<< time/1000000000 <<"\n";
+
+    Point start;
+    Point goal;
+    start.x = 0.0;
+    start.y = 0.0;
+    start.z = 0.0;
+    
+    goal.x  = 100.0;
+    goal.y  = 100.0;
+    goal.z  = 0.0;
+    printf("Starting FMT timing test\n");
+//    t1 = timeNow();
+    std::vector<int> path = F.fmtstar(start,goal);
+//    time = duration(timeNow()-t1);
+//    std::cout<<"Collision-free time: "<< time/1000000000 <<"\n";
+    
+    
     return 0;
 }
-
