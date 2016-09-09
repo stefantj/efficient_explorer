@@ -10,6 +10,11 @@
 		1F560D9A1D3D3BD700047B10 /* fmt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F560D991D3D3BD700047B10 /* fmt.cpp */; };
 		1F560D9C1D3D3BD700047B10 /* FMT.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1F560D9B1D3D3BD700047B10 /* FMT.1 */; };
 		1F560DA41D3D568000047B10 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F560DA31D3D568000047B10 /* main.cpp */; };
+		1FB057EC1D6FD873002FF4E4 /* smoother.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FB057EA1D6FD873002FF4E4 /* smoother.cpp */; };
+		1FE3658E1D42C72100D4CD0D /* Explorer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE3658C1D42C72100D4CD0D /* Explorer.cpp */; };
+		1FE365911D42C7C700D4CD0D /* simulator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE3658F1D42C7C700D4CD0D /* simulator.cpp */; };
+		1FE365B31D466C9900D4CD0D /* utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE365B21D466C9900D4CD0D /* utilities.cpp */; };
+		1FE365B61D4697C000D4CD0D /* Hungarian.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE365B41D4697C000D4CD0D /* Hungarian.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -26,11 +31,38 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1F560C031D3F1D3200708F30 /* map.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = map.h; sourceTree = "<group>"; };
 		1F560D961D3D3BD700047B10 /* FMT */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = FMT; sourceTree = BUILT_PRODUCTS_DIR; };
 		1F560D991D3D3BD700047B10 /* fmt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = fmt.cpp; sourceTree = "<group>"; };
 		1F560D9B1D3D3BD700047B10 /* FMT.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = FMT.1; sourceTree = "<group>"; };
 		1F560DA21D3D3BE900047B10 /* fmt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fmt.h; sourceTree = "<group>"; };
 		1F560DA31D3D568000047B10 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		1FB057EA1D6FD873002FF4E4 /* smoother.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = smoother.cpp; sourceTree = "<group>"; };
+		1FB057EB1D6FD873002FF4E4 /* smoother.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = smoother.h; sourceTree = "<group>"; };
+		1FB057ED1D6FD96E002FF4E4 /* afghan_village.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = afghan_village.h; sourceTree = "<group>"; };
+		1FE3658C1D42C72100D4CD0D /* Explorer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Explorer.cpp; sourceTree = "<group>"; };
+		1FE3658D1D42C72100D4CD0D /* Explorer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Explorer.h; sourceTree = "<group>"; };
+		1FE3658F1D42C7C700D4CD0D /* simulator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulator.cpp; sourceTree = "<group>"; };
+		1FE365901D42C7C700D4CD0D /* simulator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = simulator.h; sourceTree = "<group>"; };
+		1FE365A21D43E38600D4CD0D /* map2.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map2.h; path = remaps/map2.h; sourceTree = "<group>"; };
+		1FE365A31D43E38600D4CD0D /* map3.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map3.h; path = remaps/map3.h; sourceTree = "<group>"; };
+		1FE365A41D43E38600D4CD0D /* map4.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map4.h; path = remaps/map4.h; sourceTree = "<group>"; };
+		1FE365A51D43E38600D4CD0D /* map5.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map5.h; path = remaps/map5.h; sourceTree = "<group>"; };
+		1FE365A61D43E38600D4CD0D /* map6.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map6.h; path = remaps/map6.h; sourceTree = "<group>"; };
+		1FE365A71D43E38600D4CD0D /* map7.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map7.h; path = remaps/map7.h; sourceTree = "<group>"; };
+		1FE365A81D43E38600D4CD0D /* map8.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map8.h; path = remaps/map8.h; sourceTree = "<group>"; };
+		1FE365A91D43E38600D4CD0D /* map9.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map9.h; path = remaps/map9.h; sourceTree = "<group>"; };
+		1FE365AA1D43E38600D4CD0D /* map10.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map10.h; path = remaps/map10.h; sourceTree = "<group>"; };
+		1FE365AB1D43E38600D4CD0D /* map11.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map11.h; path = remaps/map11.h; sourceTree = "<group>"; };
+		1FE365AC1D43E38600D4CD0D /* map12.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map12.h; path = remaps/map12.h; sourceTree = "<group>"; };
+		1FE365AD1D43E38600D4CD0D /* map13.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map13.h; path = remaps/map13.h; sourceTree = "<group>"; };
+		1FE365AE1D43E38600D4CD0D /* map14.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map14.h; path = remaps/map14.h; sourceTree = "<group>"; };
+		1FE365AF1D43E38600D4CD0D /* map15.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map15.h; path = remaps/map15.h; sourceTree = "<group>"; };
+		1FE365B01D43E38600D4CD0D /* map16.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = map16.h; path = remaps/map16.h; sourceTree = "<group>"; };
+		1FE365B11D44588400D4CD0D /* utilities.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = utilities.h; sourceTree = "<group>"; };
+		1FE365B21D466C9900D4CD0D /* utilities.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = utilities.cpp; sourceTree = "<group>"; };
+		1FE365B41D4697C000D4CD0D /* Hungarian.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Hungarian.cpp; sourceTree = "<group>"; };
+		1FE365B51D4697C000D4CD0D /* Hungarian.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Hungarian.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,12 +95,47 @@
 		1F560D981D3D3BD700047B10 /* FMT */ = {
 			isa = PBXGroup;
 			children = (
+				1FB057ED1D6FD96E002FF4E4 /* afghan_village.h */,
+				1FE365B41D4697C000D4CD0D /* Hungarian.cpp */,
+				1FE365B51D4697C000D4CD0D /* Hungarian.h */,
+				1FE365921D43E18600D4CD0D /* mapfiles */,
 				1F560D991D3D3BD700047B10 /* fmt.cpp */,
 				1F560DA31D3D568000047B10 /* main.cpp */,
 				1F560DA21D3D3BE900047B10 /* fmt.h */,
 				1F560D9B1D3D3BD700047B10 /* FMT.1 */,
+				1FE3658C1D42C72100D4CD0D /* Explorer.cpp */,
+				1FE3658D1D42C72100D4CD0D /* Explorer.h */,
+				1FE3658F1D42C7C700D4CD0D /* simulator.cpp */,
+				1FE365901D42C7C700D4CD0D /* simulator.h */,
+				1FE365B11D44588400D4CD0D /* utilities.h */,
+				1FE365B21D466C9900D4CD0D /* utilities.cpp */,
+				1FB057EA1D6FD873002FF4E4 /* smoother.cpp */,
+				1FB057EB1D6FD873002FF4E4 /* smoother.h */,
 			);
 			path = FMT;
+			sourceTree = "<group>";
+		};
+		1FE365921D43E18600D4CD0D /* mapfiles */ = {
+			isa = PBXGroup;
+			children = (
+				1FE365A21D43E38600D4CD0D /* map2.h */,
+				1FE365A31D43E38600D4CD0D /* map3.h */,
+				1FE365A41D43E38600D4CD0D /* map4.h */,
+				1FE365A51D43E38600D4CD0D /* map5.h */,
+				1FE365A61D43E38600D4CD0D /* map6.h */,
+				1FE365A71D43E38600D4CD0D /* map7.h */,
+				1FE365A81D43E38600D4CD0D /* map8.h */,
+				1FE365A91D43E38600D4CD0D /* map9.h */,
+				1FE365AA1D43E38600D4CD0D /* map10.h */,
+				1FE365AB1D43E38600D4CD0D /* map11.h */,
+				1FE365AC1D43E38600D4CD0D /* map12.h */,
+				1FE365AD1D43E38600D4CD0D /* map13.h */,
+				1FE365AE1D43E38600D4CD0D /* map14.h */,
+				1FE365AF1D43E38600D4CD0D /* map15.h */,
+				1FE365B01D43E38600D4CD0D /* map16.h */,
+				1F560C031D3F1D3200708F30 /* map.h */,
+			);
+			name = mapfiles;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -122,7 +189,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1FE365B31D466C9900D4CD0D /* utilities.cpp in Sources */,
+				1FB057EC1D6FD873002FF4E4 /* smoother.cpp in Sources */,
+				1FE365B61D4697C000D4CD0D /* Hungarian.cpp in Sources */,
 				1F560DA41D3D568000047B10 /* main.cpp in Sources */,
+				1FE3658E1D42C72100D4CD0D /* Explorer.cpp in Sources */,
+				1FE365911D42C7C700D4CD0D /* simulator.cpp in Sources */,
 				1F560D9A1D3D3BD700047B10 /* fmt.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -162,6 +234,11 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/,
+				);
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -197,6 +274,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -204,6 +282,7 @@
 		1F560DA01D3D3BD700047B10 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				GCC_OPTIMIZATION_LEVEL = 3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -211,6 +290,11 @@
 		1F560DA11D3D3BD700047B10 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				"HEADER_SEARCH_PATHS[arch=*]" = (
+					"$(inherited)",
+					/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include,
+					/usr/local/,
+				);
 				"OTHER_CPLUSPLUSFLAGS[arch=*]" = "$(OTHER_CFLAGS)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -235,6 +319,7 @@
 				1F560DA11D3D3BD700047B10 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
