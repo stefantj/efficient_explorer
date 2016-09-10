@@ -117,14 +117,18 @@ int PathSmoother::smooth_path(Point* path, Point* v_init, Point* a_init, Point* 
     
     
     // Initial time hueristic:
-    double nom_speed = norm(v_init[0]);
-    if(nom_speed == 0)
-        nom_speed = 1.0;
+    double nom_speed = 2.0;
     double T_nom = 1.2*(path[0].y)/nom_speed; // Nominal distance/nominal velocity
-    T_nom = 1.0; // can't be too large or bad stuff
+//    T_nom = 15.0; // can't be too large or bad stuff
+
+    if(T_nom > 200)
+        T_nom = 200;
+
+    
+    
 //    printf("T_split = ");
     for(int k = 0; k < num_points-1; k++){
-        T_split[k+1] = 1/((float)num_points-1) + T_split[k];
+        T_split[k+1] = T_nom/((float)num_points-1) + T_split[k];
 //        printf("%f ", T_split[k+1]);
     }
 //    printf("\n");
@@ -555,4 +559,18 @@ void PathSmoother::get_point(float t, Point* loc_at_t){
         loc_at_t->z += z_coeffs[k]*coeff;
         coeff *= t;
     }    
+}
+
+void PathSmoother::get_der(float t, int d, Point* vel_at_t){
+    vel_at_t->x = 0.0;
+    vel_at_t->y = 0.0;
+    vel_at_t->z = 0.0;
+    
+    double coeff = 1;
+    for(int k = d; k < degree; k++){
+        vel_at_t->x += x_coeffs[k]*coeff;
+        vel_at_t->y += y_coeffs[k]*coeff;
+        vel_at_t->z += z_coeffs[k]*coeff;
+        coeff *= t;
+    }
 }

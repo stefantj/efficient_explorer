@@ -9,6 +9,8 @@
 
 #include "Explorer.h"
 
+
+
 // Constructor, creates a new agent
 Explorer::Explorer(int agentID, int map_x, int map_y){
     self_id = agentID;
@@ -779,6 +781,9 @@ void Explorer::compute_cost(Point start, Point goal, Point* path, int goal_num){
         goal_costs[self_id][goal_num] = path[0].y;
     }
 }
+
+
+
 
 int Explorer::compute_costs(){
     num_goals = 0;

@@ -89,6 +89,91 @@ void Simulator::run_simulator(int iters, int team_size){
             }
         }
     }
+    
+    
+    
+    
+    /*
+        Point path[100];
+        Point start, goal;
+        start.x = 75.0; start.y = 80.0; start.z = 0.0;
+        goal.x = 200.0; goal.y = 200.0; goal.z = 0.0;
+        
+        FMT F_dense = FMT(true_map.X_dim, true_map.Y_dim, 0, F_DENSE_PTS, RAD_CON, 0);
+        F_dense.clear_cache();
+        F_dense.fmtstar(start, goal, &true_map, path);
+    
+    start.x = 75.0; start.y = 80.0; start.z = 0.0;
+    goal.x = 50.0; goal.y = 100.0; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    start.x = 75.0; start.y = 80.0; start.z = 0.0;
+    goal.x = 50.0; goal.y = 200.0; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    start.x = 75.0; start.y = 80.0; start.z = 0.0;
+    goal.x = 150,0; goal.y = 110.0; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    start.x = 75.0; start.y = 80.0; start.z = 0.0;
+    goal.x = 40.0; goal.y = 25.0; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 54; goal.y = 108; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 82; goal.y = 113; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 44.5; goal.y = 88.5; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 26.2; goal.y = 82.5; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 27; goal.y = 64; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 45.6; goal.y = 41.5; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 103.5; goal.y = 32.0; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 144; goal.y = 33; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 153; goal.y = 33; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 172; goal.y = 20.7; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 172; goal.y = 67.8; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+    goal.x = 185; goal.y = 75; goal.z = 0.0;
+    F_dense.clear_cache();
+    F_dense.fmtstar(start, goal, &true_map, path);
+
+
+    return;
+*/
 
     for(int i = 0; i < num_agents; i++){
         printf("Making agent %d\n",i);

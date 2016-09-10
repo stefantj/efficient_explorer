@@ -11,7 +11,7 @@
 //Used to toggle debug text
 //#define FMT_DEBUG
 //#define FMT_TIMING
-#define FMT_JULIA_DEBUG
+//#define FMT_JULIA_DEBUG
 
 // Connection types
 #define RAD_CON 1

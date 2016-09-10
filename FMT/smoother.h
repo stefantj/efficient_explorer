@@ -27,6 +27,7 @@ public:
     
     // Returns value of polynomial at parameter t
     void get_point(float t, Point* loc_at_t);
+    void get_der(float t, int d, Point* vel_at_t);
     
     void test_smoother();
     void test_householder();

@@ -562,6 +562,11 @@ void FMT::plan_path(Map* map, Point* path){
         for(int t = 0; t < num_sample; t++){
             t_eval += dt;
             Smoothed.get_point(t_eval, &pos);
+            // mega fail.
+            if(pos.x != pos.x || pos.y != pos.y){
+                printf("t_eval = %f\n", t_eval);
+                break;
+            }
 
             // Check if close to next point
             if( dist(pos, pp[point_index+1]) < 0.1){
@@ -588,16 +593,62 @@ void FMT::plan_path(Map* map, Point* path){
                 pp[k+1].z = pp[k].z;
             }
             
-            // Add a point between point_index-1 and point_index
-            pp[point_index+1].x = (pp[point_index+2].x + pp[point_index].x)/2;
-            pp[point_index+1].y = (pp[point_index+2].y + pp[point_index].y)/2;
+            // Add a point at the projection of the collision onto the segment AB:
+            //
+            //
+            // C            B
+            //   .        *
+            //     .    *
+            //        o
+            //      *
+            //    *
+            //  *
+            //A
+            //
+            // The intersection is solved by doing a linear projection:
+            //
+            // (AC)•(AB)/(|AB|) * (AB)
+            
+            float dx_ab = pp[point_index+2].x - pp[point_index].x;
+            float dy_ab = pp[point_index+2].y - pp[point_index].y;
+            float dx_ac = pos.x - pp[point_index].x;
+            float dy_ac = pos.y - pp[point_index].y;
+            float coeff = (dx_ac*dx_ab + dy_ac*dy_ab)/(dx_ab*dx_ab + dy_ab*dy_ab);
+            if(coeff <= 1.0 || coeff < 0.0){
+                pp[point_index+1].x = coeff*dx_ab + pp[point_index].x;
+                pp[point_index+1].y = coeff*dy_ab + pp[point_index].y;
+            }else{
+                pp[point_index+1].x = pp[point_index].x+dx_ab/2.0;
+                pp[point_index+1].y = pp[point_index].y+dy_ab/2.0;
+            }
+            // Now we move the old point back as much as we can:
+            if(point_index != 1){
+                float num_steps = 30;
+                dx_ab = (pp[point_index].x - pp[point_index-1].x)/num_steps;
+                dy_ab = (pp[point_index].y - pp[point_index-1].y)/num_steps;
+                for(int k = 0; k < num_steps; k++){
+                    pp[point_index].x -= dx_ab;
+                    pp[point_index].y -= dy_ab;
+                    
+                    if(collision(pp[point_index], pp[point_index+1], map)){
+                        pp[point_index].x += dx_ab;
+                        pp[point_index].y += dy_ab;
+                        break;
+                    }
+                }
+            }
+            
             pp[point_index+1].z = (pp[point_index+2].z + pp[point_index].z)/2;
+            fail_counter++;
         }
-        fail_counter++;
-        if(fail_counter > 10)
+        if(pp[0].x > 12){
             break;
+        }
     }
 #ifdef FMT_JULIA_DEBUG
+    printf("chomp(readline()); clf();\n");
+    printf("println(\"Drawing new figure from point (%f,%f)\");\n", path[1].x, path[1].y);
+
     // Show original path
     printf("fmt_path = [");
     for(int k = 0; k < path[0].x; k++){
@@ -611,24 +662,22 @@ void FMT::plan_path(Map* map, Point* path){
     
 #endif
     // Replace path with sampled polynomial
-    float speed_limit = 2.0; // Meters/second
-    float dt = 1.0;          // seconds between samples
-    // For now just do average speed...
     float t = 0;
-
-    // Rescale dt
-    dt = (speed_limit*dt*Smoothed.T_split[Smoothed.num_points-1])/(Smoothed.get_length());
-    float smoothed_vel[100];
+    Point smoothed_vel[100];
+    Point smoothed_acc[100];
+    Point smoothed_jerk[100];
+    float times[100];
+    float dt = 1.0;
     
     for(path[0].x = 1; path[0].x < 100; path[0].x++){
         int k = (int)path[0].x;
         if(&path[k] == NULL)
             break;
         Smoothed.get_point(t,&(path[k]));
-        if(k > 1){
-            smoothed_vel[k-1] = dist(path[k], path[k-1])/0.1;
-//            printf("vel = %f\n", smoothed_vel[k-1]);
-        }
+        Smoothed.get_der(t, 1, &(smoothed_vel[k-1]));
+        Smoothed.get_der(t, 2, &(smoothed_acc[k-1]));
+        Smoothed.get_der(t, 3, &(smoothed_jerk[k-1]));
+        times[k-1] = t;
         t+=dt;
         if(t >= Smoothed.T_split[Smoothed.num_points-1])
             break;
@@ -643,6 +692,44 @@ void FMT::plan_path(Map* map, Point* path){
             printf("];\n");
         }else{
             printf("; ");
+        }
+    }
+    
+    printf("smoothed_vel = [");
+    for(int k = 0; k < path[0].x; k++){
+        printf("%f %f %f ", smoothed_vel[k].x, smoothed_vel[k].y, smoothed_vel[k].z);
+        if(k == int(path[0].x)-1){
+            printf("];\n");
+        }else{
+            printf("; ");
+        }
+    }
+
+    printf("smoothed_acc = [");
+    for(int k = 0; k < path[0].x; k++){
+        printf("%f %f %f ", smoothed_acc[k].x, smoothed_acc[k].y, smoothed_acc[k].z);
+        if(k == int(path[0].x)-1){
+            printf("];\n");
+        }else{
+            printf("; ");
+        }
+    }
+    printf("smoothed_jerk = [");
+    for(int k = 0; k < path[0].x; k++){
+        printf("%f %f %f ", smoothed_jerk[k].x, smoothed_jerk[k].y, smoothed_jerk[k].z);
+        if(k == int(path[0].x)-1){
+            printf("];\n");
+        }else{
+            printf("; ");
+        }
+    }
+    printf("times = [");
+    for(int k = 0; k < path[0].x; k++) {
+        printf("%f",times[k]);
+        if(k==int(path[0].x)-1){
+            printf("];\n");
+        }else{
+            printf(";");
         }
     }
     
@@ -677,13 +764,24 @@ void FMT::plan_path(Map* map, Point* path){
         }
     }
 //    printf("clf();\n");
-    printf("plot_poly(coeff_x,coeff_y,fmt_path_pp, %f, 3);\n", Smoothed.T_split[Smoothed.num_points-1]);
+//    printf("plot_poly(coeff_x,coeff_y,fmt_path_pp, %f, 3);\n", Smoothed.T_split[Smoothed.num_points-1]);
     printf("subplot(2,2,1);\n");
     printf("imshow(afghan_map', cmap=\"gray\", interpolation=\"none\");\n");
     printf("plot(fmt_path[:,1],fmt_path[:,2])\n");
     printf("scatter(%f,%f,marker=\"+\", color=:orange);\n", pos.x, pos.y);
+    printf("scatter(fmt_path_pp[:,1],fmt_path_pp[:,2],marker=\"o\",color=:green);\n");
     printf("scatter(fmt_path[:,1], fmt_path[:,2],marker=\"x\",color=:red);\n");
-    printf("scatter(smoothed[:,1], smoothed[:,2],marker=\"o\",color=:red);\n");
+    printf("plot(smoothed[:,1], smoothed[:,2],color=:red);\n");
+    printf("axis([0,200,0,200]);\n");
+    printf("subplot(2,2,2)\n");
+    printf("plot(times, smoothed_vel[:,1], color=:red);\n");
+    printf("plot(times, smoothed_vel[:,2], color=:blue);\n");
+    printf("subplot(2,2,3)\n");
+    printf("plot(times, smoothed_acc[:,1], color=:red)\n");
+    printf("plot(times, smoothed_acc[:,2], color=:blue)\n");
+    printf("subplot(2,2,4)\n");
+    printf("plot(times, smoothed_jerk[:,1], color=:red)\n");
+    printf("plot(times, smoothed_jerk[:,2], color=:blue)\n");
 
 #endif 
     
