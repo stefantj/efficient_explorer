@@ -54,6 +54,8 @@ public:
     void print_costs();
     void print_call_rates();
     
+    void get_vel(Point* vel);
+    void get_acc(Point* acc);
     
     // Service functions
     int get_clusters(Point* cluster_centroids, float* costs, int max_num_clusters);
@@ -89,6 +91,8 @@ private:
     
     Point paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals
 
+    Point current_vel;
+    Point current_acc;
     
     //Map for exploration
     Map exploration_map;

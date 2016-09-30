@@ -195,7 +195,7 @@ void Explorer::assign(Point* waypoint){
         }
         
 #endif
-                                                    
+        
         assign_min(tmp_costs, target_assignments, team_size);
         if(target_assignments[self_id] >= num_goals){
             planner_status = PLANNER_DEFAULT;
@@ -241,14 +241,17 @@ void Explorer::assign(Point* waypoint){
         
         // Always replan. TODO: Fix this
         F_sparse->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
-
+        F_sparse->get_next_state(&current_vel, &current_acc);
         if(current_plan[0].x == -1){
             F_dense->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
+            F_dense->get_next_state(&current_vel, &current_acc);
         }
 
         
         
         if(current_plan[0].x == -1){
+            current_vel.x = 0.0; current_vel.y = 0.0; current_vel.z = 0.0;
+            current_acc.x = 0.0; current_acc.y = 0.0; current_acc.z = 0.0;
             
             planner_status=PLANNER_STUCK;
             waypoint->x = swarm_locs[self_id].x;
@@ -261,7 +264,24 @@ void Explorer::assign(Point* waypoint){
             waypoint->y =current_plan[2].y;
             waypoint->z =current_plan[2].z;
         }
+        
+        if(current_vel.x != current_vel.x || current_vel.y != current_vel.y || current_vel.z != current_vel.z)
+        {
+//            vel.x = 0.0; vel.y = 0.0; vel.z = 0.0;
+//            acc.x = 0.0; acc.y = 0.0; acc.z = 0.0;
 
+        }else{
+
+            F_sparse->set_initial_state(&current_vel, &current_acc);
+            F_dense->set_initial_state(&current_vel, &current_acc);
+        }
+        if(self_id >= 0){
+            printf("V%d = %f\n",self_id, norm(current_vel)*5.0/36.0);
+        }
+        
+        if(self_id >= 0){
+            printf("A%d = %f\n",self_id, norm(current_acc)*25.0/(36.0*36.0));
+        }
         
 #ifdef EXPLORE_DEBUG
         printf("Agent %d traveling to (%f,%f)\n", self_id, waypoint->x, waypoint->y);
@@ -418,30 +438,33 @@ bool Explorer::cluster_frontiers(){
     
     
     
-//    // Expand map
-//    const int inflation_radius = 2;
-//    for(int i = 0; i <  exploration_map.X_dim; i++){
-//        for(int j = 0; j < exploration_map.Y_dim; j++){
-//            if(exploration_map(i,j,0)== MAP_OCCU){
-//                 // set all valid neighbors to MAP_GOCCU
-//                 for(int di = -inflation_radius; di <= inflation_radius; di++){
-//                     if(i + di >= 0 && i+di < exploration_map.X_dim){
-//                         for(int dj = -inflation_radius; dj<=inflation_radius; dj++){
-//                             if(j + dj >= 0 && j+dj < exploration_map.Y_dim){
-//                                 if(!(di==0 && dj==0) && exploration_map(i+di, j+dj, 0) < MAP_OCC_THRESH){
-//                                     if(exploration_map(i+di, j+dj, 0) > MAP_FREE){
-//                                         exploration_map.set(i+di, j+dj, 0, MAP_GOCC_U);
-//                                     }else{
-//                                         exploration_map.set(i+di, j+dj, 0, MAP_GOCC_F);
-//                                     }
-//                                 }
-//                             }
-//                         }
-//                     }
-//                 }
-//            }
-//        }
-//    }
+    // Expand map
+    const int inflation_radius = 1;
+    for(int i = 0; i <  exploration_map.X_dim; i++){
+        for(int j = 0; j < exploration_map.Y_dim; j++){
+            if(exploration_map(i,j,0)<  MAP_OCC_THRESH){
+                 // set all valid neighbors to MAP_GOCCU
+            // Check neighbors and set self to occu if neighbor is actually occupied.
+                 for(int di = -inflation_radius; di <= inflation_radius; di++){
+                     if(i + di >= 0 && i+di < exploration_map.X_dim){
+                         for(int dj = -inflation_radius; dj<=inflation_radius; dj++){
+                             if(j + dj >= 0 && j+dj < exploration_map.Y_dim){
+                                 if(!(di==0 && dj==0) && exploration_map(i+di, j+dj, 0) > MAP_OCC_THRESH){
+                                     if(exploration_map(i+di, j+dj, 0) != MAP_GOCC_F && exploration_map(i+di, j+dj, 0) != MAP_GOCC_U ){
+                                         if(exploration_map(i,j,0) > MAP_FREE){
+                                             exploration_map.set(i, j, 0, MAP_GOCC_U);
+                                         }else{
+                                             exploration_map.set(i, j, 0, MAP_GOCC_F);
+                                         }
+                                     }
+                                 }
+                             }
+                         }
+                     }
+                 }
+            }
+        }
+    }
 
 
     
@@ -915,6 +938,19 @@ void Explorer::plot_clusters(){
     }
 }
 #endif
+
+void Explorer::get_vel(Point *vel){
+    vel->x = current_vel.x;
+    vel->y = current_vel.y;
+    vel->z = current_vel.z;
+}
+
+void Explorer::get_acc(Point *acc){
+    acc->x = current_acc.x;
+    acc->y = current_acc.y;
+    acc->z = current_acc.z;
+}
+
 
 void Explorer::print_call_rates(){
     printf("Sparse calls: %d  Dense calls: %d  Percent of first-successes: %f\n", f_sparse_calls, f_dense_calls, float(f_sparse_calls)/(float(f_sparse_calls+f_dense_calls)));

@@ -368,8 +368,13 @@ void merge_clusters(Cluster* C1, Cluster* C2){
 
 void save_julia_var(FILE* f, std::string var_name, float* variable, int num_vars){
     fprintf(f, "%s = [", var_name.c_str());
-    for(int i = 0; i < num_vars; i++)
-        fprintf(f, " %f ", variable[i]);
+    for(int i = 0; i < num_vars; i++){
+        if(variable[i]!=variable[i]){
+            fprintf(f, " NaN ");
+        }else{
+            fprintf(f, " %f ", variable[i]);
+        }
+    }
     fprintf(f,"]\n");
     fflush(f);
 }
@@ -377,7 +382,11 @@ void save_julia_var(FILE* f, std::string var_name, float* variable, int num_vars
 void save_julia_var(FILE* f, std::string var_name, Point* variable, int num_vars){
     fprintf(f, "%s = [", var_name.c_str());
     for(int i = 0; i < num_vars; i++){
-        fprintf(f, "%f %f %f", variable[i].x, variable[i].y, variable[i].z);
+        if(variable[i].x != variable[i].x || variable[i].y != variable[i].y || variable[i].z != variable[i].z){
+            fprintf(f, "NaN NaN NaN");
+        }else{
+            fprintf(f, "%f %f %f", variable[i].x, variable[i].y, variable[i].z);
+        }
         if(i+1 < num_vars)
             fprintf(f,"; ");
     }

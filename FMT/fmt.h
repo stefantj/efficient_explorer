@@ -90,6 +90,8 @@ public:
     
     void print_datafile(Point* path, int path_length, Map* map);
 
+    void get_next_state(Point* vel, Point* acc);
+    void set_initial_state(Point* vel, Point* acc);
     
     void clear_cache();
     
@@ -151,6 +153,11 @@ private:
     int* H_new;
     Neighborhood x_near;
     Neighborhood y_near;
+    
+    Point init_vel;
+    Point init_acc;
+    Point next_vel;
+    Point next_acc;
     
     // Tracking
     int num_skipped_checks;

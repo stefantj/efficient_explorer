@@ -38,6 +38,15 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
     
     y_near.costs = new float[parameters.num_pts+2];
     y_near.indices = new int[parameters.num_pts+2];
+    
+    init_vel.x = 0.0;
+    init_vel.y = 0.0;
+    init_vel.z = 0.0;
+    
+    init_acc.x = 0.0;
+    init_acc.y = 0.0;
+    init_acc.z = 0.0;
+    
 
     num_skipped_checks=0;
     num_total_checks=0;
@@ -194,10 +203,12 @@ void FMT::fmtstar(Cluster *start, Cluster *goal, Map *map, Point* path){
             }
         }
     }
+    /*
     if(!collision(path[1], path[2], map)){
         // Path is easy!
-        return;
+        path_is_easy=true;
     }
+     */
     
     // Start by constructing neighborhoods for start/finish points
     if(! compute_neighborhood(start, start_pt_ind,map) ||! compute_neighborhood(goal, goal_pt_ind,map)){
@@ -232,7 +243,7 @@ void FMT::fmtstar(Point start, Point goal, Map* map, Point* path){
     }
     
     
-    
+    /*
      if( !collision(start, goal, map)){
 #ifdef FMT_DEBUG
          printf("Easy path!");
@@ -246,8 +257,9 @@ void FMT::fmtstar(Point start, Point goal, Map* map, Point* path){
          path[2].x = goal.x;
          path[2].y = goal.y;
          path[2].z = goal.z;
-         return;
+//         return;
      }
+    */
     
 
     // Start by constructing neighborhoods for start/finish points
@@ -512,32 +524,21 @@ void FMT::plan_path(Map* map, Point* path){
         pp[k+1].z = path[k+1].z;
     }
 
-    Point v_init;
-    Point a_init;
     Point v_final;
     Point a_final;
-    // V_init in direction of first segment:
-    v_init.x = path[2].x - path[1].x;
-    v_init.y = path[2].y - path[1].y;
-    v_init.z = path[2].z - path[1].z;
-    float len = norm(v_init);
-    if(len != 0.0){
-        v_init.x /= len;
-        v_init.y /= len;
-        v_init.z /= len;
-    }
-    a_init.x = 0; a_init.y = 0; a_init.z = 0;
     // V_final pointing toward last segment:
     v_final.x = 0; v_final.y = 0; v_final.z = 0;
     if(pp[0].x > num_smooth_points){
         v_final.x = path[num_smooth_points+1].x - path[num_smooth_points].x;
         v_final.y = path[num_smooth_points+1].y - path[num_smooth_points].y;
         v_final.z = path[num_smooth_points+1].z - path[num_smooth_points].z;
-        len = norm(v_init);
-        if(len != 0.0){
-            v_final.x /= len;
-            v_final.y /= len;
-            v_final.z /= len;
+        // Adjust so final speed is initial speed. Might want to change?
+        float speed = norm(next_vel);
+        float spd2 = norm(v_final);
+        if(spd2 != 0.0){
+            v_final.x *= speed/spd2;
+            v_final.y *= speed/spd2;
+            v_final.z *= speed/spd2;
         }
     }
     a_final.x = 0; a_final.y = 0; a_final.z = 0;
@@ -550,7 +551,7 @@ void FMT::plan_path(Map* map, Point* path){
     while(path_has_collision){
         path_has_collision = false;
         // Smooth path
-        Smoothed.smooth_path(pp, &v_init, &a_init, &v_final, &a_final);
+        Smoothed.smooth_path(pp, &init_vel, &init_acc, &v_final, &a_final);
 
         // check for collision
         // Dumb way: check at 100 points
@@ -562,9 +563,9 @@ void FMT::plan_path(Map* map, Point* path){
         for(int t = 0; t < num_sample; t++){
             t_eval += dt;
             Smoothed.get_point(t_eval, &pos);
-            // mega fail.
+            // Check if NaN. mega fail.
             if(pos.x != pos.x || pos.y != pos.y){
-                printf("t_eval = %f\n", t_eval);
+                fail_counter++;
                 break;
             }
 
@@ -667,21 +668,29 @@ void FMT::plan_path(Map* map, Point* path){
     Point smoothed_acc[100];
     Point smoothed_jerk[100];
     float times[100];
-    float dt = 1.0;
+    float dt = 0.1;
+
+    if(!path_has_collision){
     
-    for(path[0].x = 1; path[0].x < 100; path[0].x++){
-        int k = (int)path[0].x;
-        if(&path[k] == NULL)
-            break;
-        Smoothed.get_point(t,&(path[k]));
-        Smoothed.get_der(t, 1, &(smoothed_vel[k-1]));
-        Smoothed.get_der(t, 2, &(smoothed_acc[k-1]));
-        Smoothed.get_der(t, 3, &(smoothed_jerk[k-1]));
-        times[k-1] = t;
-        t+=dt;
-        if(t >= Smoothed.T_split[Smoothed.num_points-1])
-            break;
-        
+        for(path[0].x = 1; path[0].x < 100; path[0].x++){
+            int k = (int)path[0].x;
+            if(&path[k] == NULL)
+                break;
+            Smoothed.get_point(t,&(path[k]));
+            Smoothed.get_der(t, 1, &(smoothed_vel[k-1]));
+#ifdef FMT_JULIA_DEBUG
+            Smoothed.get_der(t, 2, &(smoothed_acc[k-1]));
+            Smoothed.get_der(t, 3, &(smoothed_jerk[k-1]));
+#endif
+            if(k==2){
+                Smoothed.get_der(t, 1, &next_vel);
+                Smoothed.get_der(t, 2, &next_acc);
+            }
+            times[k-1] = t;
+            t+=dt;
+            if(t >= Smoothed.T_split[Smoothed.num_points-1])
+                break;
+        }
     }
 #ifdef FMT_JULIA_DEBUG
     // Show original path
@@ -798,7 +807,8 @@ void FMT::plan_path(Map* map, Point* path){
         path[0].y = MAXFLOAT;
         return;
     }else{
-        path[0].y = Smoothed.get_length();
+// TODO: Fix implementation of get_length - gives NaN results.
+//        path[0].y = Smoothed.get_length();
     }
     
     return;
@@ -1402,6 +1412,28 @@ void FMT::print_datafile(Point *path, int path_length, Map* map){
     printf("Collisions %d\n", coll_cnt);
     
 }
+
+void FMT::set_initial_state(Point *vel, Point *acc){
+    init_vel.x = vel->x;
+    init_vel.y = vel->y;
+    init_vel.z = vel->z;
+    
+    init_acc.x = acc->x;
+    init_acc.y = acc->y;
+    init_acc.z = acc->z;
+}
+
+void FMT::get_next_state(Point *vel, Point *acc){
+    
+    vel->x = next_vel.x;
+    vel->y = next_vel.y;
+    vel->z = next_vel.z;
+    
+    acc->x = next_acc.x;
+    acc->y = next_acc.y;
+    acc->z = next_acc.z;
+}
+
 
 
 void FMT::print_stats(){

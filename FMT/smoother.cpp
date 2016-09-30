@@ -117,14 +117,14 @@ int PathSmoother::smooth_path(Point* path, Point* v_init, Point* a_init, Point* 
     
     
     // Initial time hueristic:
-    double nom_speed = 2.0;
+    double nom_speed = 2.0*36.0/5.0; // TODO: Make this generic
     double T_nom = 1.2*(path[0].y)/nom_speed; // Nominal distance/nominal velocity
 //    T_nom = 15.0; // can't be too large or bad stuff
 
     if(T_nom > 200)
         T_nom = 200;
 
-    
+//    printf("T_nom = %f\n", T_nom);
     
 //    printf("T_split = ");
     for(int k = 0; k < num_points-1; k++){

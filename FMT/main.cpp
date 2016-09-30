@@ -23,7 +23,7 @@ int main(){
     
     
     Simulator S = Simulator();
-    S.run_simulator(1500, 1);
+    S.run_simulator(1500, 6);
     
     return 0;
 }

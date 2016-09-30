@@ -31,7 +31,7 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
     fprintf(f,"axis(\"equal\")\n");
     
     fprintf(f,"scatter(targets[:,1], targets[:,2], marker=\"x\", color=:red)\n");
-    /*
+    
     for(int i =0; i < num_agents; i++){
         if(agents[i].planner->current_plan[0].x > 1){
             fprintf(f,"plot(trajectory_%d[2:end,1], trajectory_%d[2:end,2], color=:red, linestyle=\"-.\");\n",i,i);
@@ -42,7 +42,7 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
             }
         }
     }
-    */
+    
     for(int i = 0; i < num_agents; i++){
         if(i%4 == 0){
             fprintf(f,"scatter(locations[%d,1], locations[%d,2], marker=\"o\", color=:green)\n",i+1,i+1);
@@ -208,6 +208,15 @@ void Simulator::run_simulator(int iters, int team_size){
     float compute_times[10000] = {0};
     float assign_times[10000]  = {0};
     float num_targets[10000]     = {0};
+    Point* position_values[num_agents];
+    Point* velocity_values[num_agents];
+    Point* acceleration_values[num_agents];
+    
+    for(int i = 0; i < num_agents; i++){
+        position_values[i] = new Point[iters];
+        velocity_values[i] = new Point[iters];
+        acceleration_values[i] = new Point[iters];
+    }
     
     for(int iteration = 0; iteration < iters; iteration++){
 #ifdef SIM_PLOT
@@ -220,6 +229,26 @@ void Simulator::run_simulator(int iters, int team_size){
         
         Point true_location_buffer[num_agents];
         Point agent_targets_buffer[num_agents];
+        
+    
+        for(int i = 0; i < num_agents; i++){
+            Point tmp;
+
+            position_values[i][iteration].x = agents[i].location.x;
+            position_values[i][iteration].y = agents[i].location.y;
+            position_values[i][iteration].z = agents[i].location.z;
+            
+            agents[i].planner->get_vel(&tmp);
+            velocity_values[i][iteration].x = tmp.x;
+            velocity_values[i][iteration].y = tmp.y;
+            velocity_values[i][iteration].z = tmp.z;
+            
+            agents[i].planner->get_acc(&tmp);
+            acceleration_values[i][iteration].x = tmp.x;
+            acceleration_values[i][iteration].y = tmp.y;
+            acceleration_values[i][iteration].z = tmp.z;
+        }
+        
         
         // Communications handled here:
         for(int i = 0; i < num_agents; i++){
@@ -353,6 +382,20 @@ void Simulator::run_simulator(int iters, int team_size){
         }
         fclose(datafile);
         
+        datafile = fopen("pos_vel_acc_traces.jl","w");
+        if(datafile==nullptr){
+            
+        }else{
+            for(int i = 0; i < num_agents; i++){
+                sprintf(filename, "position_%d",i);
+                save_julia_var(datafile, filename, position_values[i], iteration);
+                sprintf(filename, "velocity_%d",i);
+                save_julia_var(datafile, filename, velocity_values[i], iteration);
+                sprintf(filename, "acceleration_%d",i);
+                save_julia_var(datafile, filename, acceleration_values[i], iteration);
+            }
+        }
+        
         // Send agents toward their target destination:
         for(int i = 0; i < num_agents; i++)
             move_base(i);
@@ -399,7 +442,16 @@ void Simulator::run_simulator(int iters, int team_size){
 void Simulator::move_base(int agent){
     // Try using smoothed paths:
     // First, scale time:
-    
+    if(agents[agent].target.x == agents[agent].target.x)
+       agents[agent].location.x = agents[agent].target.x;
+    if(agents[agent].target.y == agents[agent].target.y)
+       agents[agent].location.y = agents[agent].target.y;
+    if(agents[agent].target.z == agents[agent].target.z)
+       agents[agent].location.z = agents[agent].target.z;
+       
+       
+
+    /*
 #ifdef SIM_DEBUG
     Point old_loc;
     old_loc.x = agents[agent].location.x;
@@ -429,6 +481,8 @@ void Simulator::move_base(int agent){
     printf("Deltas are %f %f %f. Grid velocity is %f ", dx,dy,dz,grid_vel);
     printf("Moved agent %f distance\n", dist(agents[agent].location, old_loc));
 #endif
+    */
+    
     
 }
 
