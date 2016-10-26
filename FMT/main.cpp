@@ -2,8 +2,8 @@
 //  main.cpp
 //  FMT
 //
-//  Created by Megamind on 7/18/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 #include <stdio.h>
@@ -18,12 +18,14 @@
 int main(){
     srand(time(NULL));
     
+    
+    
 //    PathSmoother sm = PathSmoother();
 //    sm.test_smoother();
     
     
     Simulator S = Simulator();
-    S.run_simulator(1500, 6);
+    S.run_simulator(1500, 1);
     
     return 0;
 }

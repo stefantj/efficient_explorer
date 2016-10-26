@@ -11,6 +11,7 @@
 		1F560D9C1D3D3BD700047B10 /* FMT.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1F560D9B1D3D3BD700047B10 /* FMT.1 */; };
 		1F560DA41D3D568000047B10 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1F560DA31D3D568000047B10 /* main.cpp */; };
 		1FB057EC1D6FD873002FF4E4 /* smoother.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FB057EA1D6FD873002FF4E4 /* smoother.cpp */; };
+		1FE0F86D1DA6BF0A0020D1AE /* polynomial.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE0F86B1DA6BF0A0020D1AE /* polynomial.cpp */; };
 		1FE3658E1D42C72100D4CD0D /* Explorer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE3658C1D42C72100D4CD0D /* Explorer.cpp */; };
 		1FE365911D42C7C700D4CD0D /* simulator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE3658F1D42C7C700D4CD0D /* simulator.cpp */; };
 		1FE365B31D466C9900D4CD0D /* utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1FE365B21D466C9900D4CD0D /* utilities.cpp */; };
@@ -40,6 +41,8 @@
 		1FB057EA1D6FD873002FF4E4 /* smoother.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = smoother.cpp; sourceTree = "<group>"; };
 		1FB057EB1D6FD873002FF4E4 /* smoother.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = smoother.h; sourceTree = "<group>"; };
 		1FB057ED1D6FD96E002FF4E4 /* afghan_village.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = afghan_village.h; sourceTree = "<group>"; };
+		1FE0F86B1DA6BF0A0020D1AE /* polynomial.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = polynomial.cpp; sourceTree = "<group>"; };
+		1FE0F86C1DA6BF0A0020D1AE /* polynomial.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = polynomial.h; sourceTree = "<group>"; };
 		1FE3658C1D42C72100D4CD0D /* Explorer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Explorer.cpp; sourceTree = "<group>"; };
 		1FE3658D1D42C72100D4CD0D /* Explorer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Explorer.h; sourceTree = "<group>"; };
 		1FE3658F1D42C7C700D4CD0D /* simulator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulator.cpp; sourceTree = "<group>"; };
@@ -100,8 +103,8 @@
 				1FE365B51D4697C000D4CD0D /* Hungarian.h */,
 				1FE365921D43E18600D4CD0D /* mapfiles */,
 				1F560D991D3D3BD700047B10 /* fmt.cpp */,
-				1F560DA31D3D568000047B10 /* main.cpp */,
 				1F560DA21D3D3BE900047B10 /* fmt.h */,
+				1F560DA31D3D568000047B10 /* main.cpp */,
 				1F560D9B1D3D3BD700047B10 /* FMT.1 */,
 				1FE3658C1D42C72100D4CD0D /* Explorer.cpp */,
 				1FE3658D1D42C72100D4CD0D /* Explorer.h */,
@@ -110,6 +113,8 @@
 				1FE365B11D44588400D4CD0D /* utilities.h */,
 				1FE365B21D466C9900D4CD0D /* utilities.cpp */,
 				1FB057EA1D6FD873002FF4E4 /* smoother.cpp */,
+				1FE0F86B1DA6BF0A0020D1AE /* polynomial.cpp */,
+				1FE0F86C1DA6BF0A0020D1AE /* polynomial.h */,
 				1FB057EB1D6FD873002FF4E4 /* smoother.h */,
 			);
 			path = FMT;
@@ -192,6 +197,7 @@
 				1FE365B31D466C9900D4CD0D /* utilities.cpp in Sources */,
 				1FB057EC1D6FD873002FF4E4 /* smoother.cpp in Sources */,
 				1FE365B61D4697C000D4CD0D /* Hungarian.cpp in Sources */,
+				1FE0F86D1DA6BF0A0020D1AE /* polynomial.cpp in Sources */,
 				1F560DA41D3D568000047B10 /* main.cpp in Sources */,
 				1FE3658E1D42C72100D4CD0D /* Explorer.cpp in Sources */,
 				1FE365911D42C7C700D4CD0D /* simulator.cpp in Sources */,

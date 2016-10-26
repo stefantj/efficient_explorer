@@ -2,8 +2,8 @@
 //  simulator.cpp
 //  FMT
 //
-//  Created by Megamind on 7/22/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 #include "simulator.h"
@@ -33,7 +33,7 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
     fprintf(f,"scatter(targets[:,1], targets[:,2], marker=\"x\", color=:red)\n");
     
     for(int i =0; i < num_agents; i++){
-        if(agents[i].planner->current_plan[0].x > 1){
+        if(agents[i].planner->curr_segs > 0){
             fprintf(f,"plot(trajectory_%d[2:end,1], trajectory_%d[2:end,2], color=:red, linestyle=\"-.\");\n",i,i);
         }
         for(int j = 0; j < num_agents; j++){
@@ -363,10 +363,10 @@ void Simulator::run_simulator(int iters, int team_size){
             save_julia_var(datafile, std::string("locations"),true_location_buffer , num_agents);
             save_julia_var(datafile, std::string("targets"),agent_targets_buffer, num_agents);
             
-            for(int i = 0; i < num_agents; i++){
-                sprintf(filename, "trajectory_%d", i);
-                save_julia_var(datafile, std::string(filename), agents[i].planner->current_plan, int(agents[i].planner->current_plan[0].x)+1);
-            }
+//           for(int i = 0; i < num_agents; i++){
+//               sprintf(filename, "trajectory_%d", i);
+//                save_julia_var(datafile, std::string(filename), agents[i].planner->current_plan, int(agents[i].planner->curr_segs));
+//            }
             if(iteration%plot_delay == 0){
                 save_julia_var(datafile, std::string("global_map"), &global_map);
             }

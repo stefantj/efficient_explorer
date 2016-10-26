@@ -4,8 +4,8 @@
 //
 //  Handles creation of frontiers, reduction to goals, and assignment.
 //
-//  Created by Megamind on 7/22/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 #ifndef __FMT__Explorer__
@@ -17,6 +17,7 @@
 #include "simulator.h"
 #include "utilities.h"
 #include "Hungarian.h"
+#include "polynomial.h"
 
 #define MAX_CLUSTERS    256
 #define MAX_CLUSTERSIZE 1048
@@ -45,8 +46,8 @@ public:
     // Planning functions
     bool cluster_frontiers();
     int  compute_costs();
-    void compute_cost(Point start, Point goal, Point* path, int goal_num);
-    void compute_cost(Point start, Cluster* goal, Point* path, int goal_num);
+    void compute_cost(Point start, Point goal, PolyState* path, int goal_num);
+//    void compute_cost(Point start, Cluster* goal, Point* path, int goal_num);
     void assign(Point* waypoint);
     
     // Plotting utilities
@@ -61,7 +62,8 @@ public:
     int get_clusters(Point* cluster_centroids, float* costs, int max_num_clusters);
     void get_neighbor_clusters(int agent_id, Point* cluster_centroids, float* costs, int n_clusters);
     
-    Point current_plan[F_DENSE_PTS+2];    // Holds the current plan
+    PolyState current_plan[F_DENSE_PTS+2];    // Holds the current plan <- memory hog.
+    int curr_segs;                            // Number of segments in current plan
 private:
     
     void relabel_frontiers(int clust1_ind, int clust2_ind);
@@ -89,8 +91,9 @@ private:
     Point goal_locations[MAX_CLUSTERS]; // Holds the goal locations of the swarm
     int num_goals;                      // Holds the number of goals for the swarm
     
-    Point paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals
-
+    PolyState paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals
+    int path_segs[MAX_CLUSTERS]; // Holds the length of the segments
+    
     Point current_vel;
     Point current_acc;
     

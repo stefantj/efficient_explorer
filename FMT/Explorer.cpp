@@ -2,8 +2,8 @@
 //  Explorer.cpp
 //  FMT
 //
-//  Created by Megamind on 7/22/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 
@@ -46,24 +46,20 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
         }
     }
 
-    // Fast planner used most of the time
-    F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, RAD_CON, 0);
-    f_sparse_calls = 0;
-    // Slow(er) planner used when F_sparse fails
-    F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, RAD_CON, 0);
-    f_dense_calls = 0;
     
+    // Mark as a bad plan:
+    current_plan[0].cost = -1;
     for(int j=0; j < F_DENSE_PTS+2; j++){
-        current_plan[j].x = -1;
-        current_plan[j].y = -1;
-        current_plan[j].z = -1;
+//        current_plan[j].x = -1;
+//        current_plan[j].y = -1;
+//        current_plan[j].z = -1;
     }
     
     for(int i = 0; i < MAX_CLUSTERS; i++){
         for(int j = 0; j < F_DENSE_PTS+2; j++){
-            paths[i][j].x=-1;
-            paths[i][j].y=-1;
-            paths[i][j].z=-1;
+            paths[i][j].cost=-1;
+            paths[i][j].cost=-1;
+            paths[i][j].cost=-1;
         }
     }
 
@@ -77,6 +73,13 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
         for(int j = 0; j < map_y; j++)
             exploration_map.set(i, j, 0, MAP_UNKN);
     
+    // Fast planner used most of the time
+    F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, RAD_CON, 0, &exploration_map);
+    f_sparse_calls = 0;
+    // Slow(er) planner used when F_sparse fails
+    F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, RAD_CON, 0, &exploration_map);
+    f_dense_calls = 0;
+
 }
 
 Explorer::~Explorer(){
@@ -227,29 +230,15 @@ void Explorer::assign(Point* waypoint){
 #endif
         
         
-        // set current plan to the precomputed plan
-        current_plan[0].x = paths[goal_ind][0].x;
-        current_plan[0].y = paths[goal_ind][0].y;
-        current_plan[0].z = paths[goal_ind][0].z;
-        
-        for(int i = 1; i < paths[goal_ind][0].x; i++){
-            current_plan[i].x = paths[goal_ind][i].x;
-            current_plan[i].y = paths[goal_ind][i].y;
-            current_plan[i].z = paths[goal_ind][i].z;
-        }
-        
-        
         // Always replan. TODO: Fix this
-        F_sparse->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
-        F_sparse->get_next_state(&current_vel, &current_acc);
-        if(current_plan[0].x == -1){
-            F_dense->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
-            F_dense->get_next_state(&current_vel, &current_acc);
+        curr_segs = F_sparse->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
+        if(current_plan[0].cost == -1){
+            curr_segs = F_dense->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
         }
 
         
         
-        if(current_plan[0].x == -1){
+        if(current_plan[0].cost == -1){
             current_vel.x = 0.0; current_vel.y = 0.0; current_vel.z = 0.0;
             current_acc.x = 0.0; current_acc.y = 0.0; current_acc.z = 0.0;
             
@@ -258,12 +247,18 @@ void Explorer::assign(Point* waypoint){
             waypoint->y = swarm_locs[self_id].y;
             waypoint->z = swarm_locs[self_id].z;
             
-        }else{
-            
-            waypoint->x =current_plan[2].x;
-            waypoint->y =current_plan[2].y;
-            waypoint->z =current_plan[2].z;
+        }else{ // this is looking at the next point.
+            waypoint->x =current_plan[1].coefficients_x[0];
+            waypoint->y =current_plan[1].coefficients_y[0];
+            waypoint->z =current_plan[1].coefficients_z[0];
         }
+        
+        
+        // Update velocity.
+        float dt = 0.1;
+        get_poly_der(current_plan[0], dt, &current_vel, 1);
+        get_poly_der(current_plan[0], dt, &current_acc, 2);
+        
         
         if(current_vel.x != current_vel.x || current_vel.y != current_vel.y || current_vel.z != current_vel.z)
         {
@@ -769,7 +764,9 @@ bool Explorer::cluster_frontiers(){
     // Exploration not done yet
     return false;
 }
-void Explorer::compute_cost(Point start, Cluster* goal, Point* path, int goal_num){
+
+/*
+void Explorer::compute_cost(Point start, Cluster* goal, PolyState* path, int goal_num){
     F_sparse->fmtstar(start, goal, &exploration_map, path);
     
     
@@ -785,23 +782,25 @@ void Explorer::compute_cost(Point start, Cluster* goal, Point* path, int goal_nu
     }
 
 }
-void Explorer::compute_cost(Point start, Point goal, Point* path, int goal_num){
+ */
 
-    F_sparse->fmtstar(start, goal, &exploration_map, path);
+void Explorer::compute_cost(Point start, Point goal, PolyState* path, int goal_num){
+
+    path_segs[goal_num] = F_sparse->fmtstar(start, goal, &exploration_map, path);
     
 
     f_sparse_calls++;
-    if(path[0].x == -1){
-        F_dense->fmtstar(start, goal, &exploration_map, path);
+    if(path[0].cost == -1){
+        path_segs[goal_num] = F_dense->fmtstar(start, goal, &exploration_map, path);
         f_dense_calls++;
     }
-    if(path[0].x == -1){
+    if(path[0].cost == -1){
 #ifdef EXPLORE_DEBUG
         printf("Couldn't find a path to goal (%f,%f)\n", goal.x, goal.y);
 #endif
-    goal_costs[self_id][goal_num] = 1000000;
+        goal_costs[self_id][goal_num] = 1000000;
     }else{
-        goal_costs[self_id][goal_num] = path[0].y;
+        goal_costs[self_id][goal_num] = path[0].cost;
     }
 }
 
@@ -831,10 +830,10 @@ int Explorer::compute_costs(){
     // Discount the goal you already chose
     Point goal_pt;
     int goal_ind = -1;
-    if(current_plan[0].x != -1){
-        goal_pt.x = current_plan[int(current_plan[0].x+1)].x;
-        goal_pt.y = current_plan[int(current_plan[0].x+1)].y;
-        goal_pt.z = current_plan[int(current_plan[0].x+1)].z;
+    if(current_plan[0].cost != -1){
+        goal_pt.x = current_plan[curr_segs-1].coefficients_x[0];
+        goal_pt.y = current_plan[curr_segs-1].coefficients_x[0];
+        goal_pt.z = current_plan[curr_segs-1].coefficients_x[0];
         
         // Don't discount staying still.
             float mindist = MAXFLOAT;
@@ -878,8 +877,8 @@ void Explorer::relabel_frontiers(int clust1_ind, int clust2_ind){
 
 void Explorer::print_costs(){
     for(int i = 0; i < num_active_clusters; i++){
-        if(paths[i][0].x != -1){
-            printf("cost to (%f,%f) is %f with %f segments\n", clusters[active_clusters[i]].median.x, clusters[active_clusters[i]].median.y, paths[i][0].y, paths[i][0].x);}
+        if(paths[i][0].cost != -1){
+            printf("cost to (%f,%f) is %f with %d segments\n", clusters[active_clusters[i]].median.x, clusters[active_clusters[i]].median.y, paths[i][0].cost, path_segs[i]);}
     }
 }
 

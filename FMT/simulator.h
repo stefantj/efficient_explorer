@@ -4,8 +4,8 @@
 //
 //  Handles simple physics and message passing
 //
-//  Created by Megamind on 7/22/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 #ifndef __FMT__simulator__
