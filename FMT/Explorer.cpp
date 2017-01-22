@@ -50,19 +50,13 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
     // Mark as a bad plan:
     current_plan[0].cost = -1;
     for(int j=0; j < F_DENSE_PTS+2; j++){
+        current_plan[j].cost = -1;
         current_plan[j].cells = new size_t[MAX_POLY_CELLS];
-//        current_plan[j].x = -1;
-//        current_plan[j].y = -1;
-//        current_plan[j].z = -1;
     }
     
-    for(int i = 0; i < MAX_CLUSTERS; i++){
-        for(int j = 0; j < F_DENSE_PTS+2; j++){
-            paths[i][j].cost=-1;
-            paths[i][j].cost=-1;
-            paths[i][j].cost=-1;
-            paths[i][j].cells = new size_t[MAX_POLY_CELLS];
-        }
+    for(int i = 0; i < F_DENSE_PTS+2; i++){
+            tmp_path[i].cost=-1;
+            tmp_path[i].cells = new size_t[MAX_POLY_CELLS];
     }
 
     exploration_map.X_dim = map_x;
@@ -79,7 +73,7 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
     F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, KNN_CON, 75, &exploration_map);
     f_sparse_calls = 0;
     // Slow(er) planner used when F_sparse fails
-    F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, KNN_CON, 2, &exploration_map);
+    F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, KNN_CON, 75, &exploration_map);
     f_dense_calls = 0;
 
 }
@@ -90,6 +84,11 @@ Explorer::~Explorer(){
     delete[] exploration_map.data;
     for(int i = 0; i < MAX_CLUSTERS; i++){
         delete [] clusters[i].members;
+    }
+    
+    for(int i = 0; i < F_DENSE_PTS+2; i++){
+        delete [] current_plan[i].cells;
+        delete [] tmp_path[i].cells;
     }
     delete [] frontiers;
     delete[] cluster_ids;
@@ -317,6 +316,13 @@ void Explorer::assign(Point* waypoint){
             printf("V%d = %f\n",self_id, norm(current_vel)*5.0/36.0);
             printf("A%d = %f\n",self_id, norm(current_acc)*25.0/(1296.0));
         }
+        
+        
+        
+        printf("Current plan uses %d paths of %d allocated. Each path has size %ld, meaning %f space is wasted\n", curr_segs, F_DENSE_PTS+2,  sizeof(current_plan[0]), float( sizeof(current_plan[0]))*(F_DENSE_PTS+2-curr_segs));
+        
+        printf("Size of small FMT planner: %ld. Size of large FMT planner: %ld\n", sizeof(F_sparse), sizeof(&F_dense));
+        
         
 #ifdef EXPLORE_DEBUG
         printf("Agent %d traveling to (%f,%f)\n", self_id, waypoint->x, waypoint->y);
@@ -864,7 +870,7 @@ int Explorer::compute_costs(){
         goal_locations[i].y = clusters[active_clusters[i]].median.y;
         goal_locations[i].z = clusters[active_clusters[i]].median.z;
         num_goals+=1;
-        compute_cost(swarm_locs[self_id], clusters[active_clusters[i]].median, paths[i], i);
+        compute_cost(swarm_locs[self_id], clusters[active_clusters[i]].median, tmp_path, i);
     }
     
     // Discount the goal you already chose
@@ -916,10 +922,10 @@ void Explorer::relabel_frontiers(int clust1_ind, int clust2_ind){
 
 
 void Explorer::print_costs(){
-    for(int i = 0; i < num_active_clusters; i++){
-        if(paths[i][0].cost != -1){
-            printf("cost to (%f,%f) is %f with %d segments\n", clusters[active_clusters[i]].median.x, clusters[active_clusters[i]].median.y, paths[i][0].cost, path_segs[i]);}
-    }
+//    for(int i = 0; i < num_active_clusters; i++){
+//        if(paths[i][0].cost != -1){
+//            printf("cost to (%f,%f) is %f with %d segments\n", clusters[active_clusters[i]].median.x, clusters[active_clusters[i]].median.y, paths[i][0].cost, path_segs[i]);}
+//    }
 }
 
 #ifdef EXPLORE_PLOT

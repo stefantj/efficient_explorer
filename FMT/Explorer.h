@@ -101,7 +101,8 @@ private:
     Point goal_locations[MAX_CLUSTERS]; // Holds the goal locations of the swarm
     int num_goals;                      // Holds the number of goals for the swarm
     
-    PolyState paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals
+//    PolyState paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals
+    PolyState tmp_path[F_DENSE_PTS+2];
     int path_segs[MAX_CLUSTERS]; // Holds the length of the segments
     
     

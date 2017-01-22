@@ -3,7 +3,9 @@
  ******************
  Operational Status
  ******************
- Code runs. Paths returned are crap. Collision checking appears to fail most of the time.
+ Code runs. Paths returned are crap. Collision checking appears to fail most of the time. 
+ 
+ Top priority item is to move to a drift sensitive version of FMT or an actual kinodynamic version.
  
  *****************
  Summary of Issues
@@ -18,6 +20,7 @@
  > Collision checking does not seem to do anything
  > Polynomial paths returned as `good' do not seem good at all. Might be adding an extra segment to the visualization
  > Planner does not compensate for drift
+ > Collision checking should be split into cached (for pre-generated tree) and on-line (for start/end connections). Cacheing the on-line portion is actually more expensive.
  
  Explorer issues:
  > Seeing switching behavior again
@@ -34,11 +37,18 @@
     Need to verify that the right cells are checked. Seems like collision checking is largely irrelevant to the paths chosen.
  
     Really should look into the drift version of FMT
+
+
  
  ********
  Comments
  ********
- (ALL) Reduce memory footprint
+ 
+ (ALL) Reduce memory footprint:
+ > MAX_POLY_CELLS is too small to be conservative (there are paths which use all of it), but at the same time the average path only uses half of the bytes. This wastes 65k for the small graph and 1.6M for the larger one. Significant, but not huge
+ > Each PolyState object takes 520 bytes, and the current_plan container only uses ~2-5 of 1024 allocated objects. This is a 500k waste.
+ > F_dense is around 85 MB, F_sparse is around 35MB accounting for the 2/3 of the memory allocated.
+
  
  (UTILS) Use appropriate classes to replace "utilities.h", e.g. map, graph, search, etc.
  Smoother interface - should make polynomial agnostic so we can easily switch to a 2pbvp approach/exact approach.

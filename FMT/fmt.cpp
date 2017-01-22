@@ -90,9 +90,12 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
     parameters.Z_vel_limit = 0.5; // meters/second
     parameters.Z_acc_limit = 0.3; // meters/second^2
     
+    if(connection_type == RAD_CON){
+        max_neighborhood_size = int(num_pts/5);
+    }else if(connection_type == KNN_CON){
+        max_neighborhood_size = int(connection_param+10);
+    }
     
-    max_neighborhood_size = int(num_pts/5);
-
     smoother = new PolynomialSmoother();
 
     // Preallocate vectors (+2 because we add start and end points at the end)
@@ -110,6 +113,21 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
 
 #endif
     
+    
+    int max_num_cells = 0;
+    float mean_cells = 0;
+    float cells_count = 0;
+    for(int i = 0; i < parameters.num_pts+2; i++){
+        for(int j = 0; j < neighborhoods[i].size; j++){
+            if(neighborhoods[i].paths[j].num_cells > max_num_cells)
+                max_num_cells = neighborhoods[i].paths[j].num_cells;
+            mean_cells = mean_cells*(cells_count/(cells_count+1)) + (float)neighborhoods[i].paths[j].num_cells/(cells_count+1);
+            cells_count+=1;
+        }
+    }
+    
+    printf(" Maximum number of cells used: %d. Maximum allocated: %d\n", max_num_cells, MAX_POLY_CELLS);
+    printf(" Average number of cells used: %f. Wasted allocation: %f\n", mean_cells, (MAX_POLY_CELLS-mean_cells)*cells_count);
     
     
     
