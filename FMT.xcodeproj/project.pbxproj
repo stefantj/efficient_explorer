@@ -38,6 +38,7 @@
 		1F560D9B1D3D3BD700047B10 /* FMT.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = FMT.1; sourceTree = "<group>"; };
 		1F560DA21D3D3BE900047B10 /* fmt.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = fmt.h; sourceTree = "<group>"; };
 		1F560DA31D3D568000047B10 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		1FAA14DF1E33B3FE00C7ED7F /* development_notes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = development_notes.h; sourceTree = "<group>"; };
 		1FB057EA1D6FD873002FF4E4 /* smoother.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = smoother.cpp; sourceTree = "<group>"; };
 		1FB057EB1D6FD873002FF4E4 /* smoother.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = smoother.h; sourceTree = "<group>"; };
 		1FB057ED1D6FD96E002FF4E4 /* afghan_village.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = afghan_village.h; sourceTree = "<group>"; };
@@ -116,6 +117,7 @@
 				1FE0F86B1DA6BF0A0020D1AE /* polynomial.cpp */,
 				1FE0F86C1DA6BF0A0020D1AE /* polynomial.h */,
 				1FB057EB1D6FD873002FF4E4 /* smoother.h */,
+				1FAA14DF1E33B3FE00C7ED7F /* development_notes.h */,
 			);
 			path = FMT;
 			sourceTree = "<group>";

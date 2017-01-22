@@ -82,6 +82,9 @@ struct PolyState{
     float cost;
 };
 
+void copy_polystate(PolyState* dest, PolyState* source);
+
+
 
 inline float dist(Point x1, Point x2){
     return sqrtf((x1.x-x2.x)*(x1.x-x2.x) + (x1.y-x2.y)*(x1.y-x2.y) + (x1.z-x2.z)*(x1.z-x2.z));
@@ -89,6 +92,10 @@ inline float dist(Point x1, Point x2){
 
 inline float norm(Point x){
     return sqrtf((x.x*x.x + x.y*x.y + x.z*x.z));
+}
+
+inline float sign(float x){
+    return (1 - 2*(x < 0.0));
 }
 
 float nice_angle(float theta);
@@ -173,7 +180,7 @@ void merge_clusters(Cluster* C1, Cluster* C2);
 
 void save_julia_var(FILE* f, std::string var_name, float* variable, int num_vars);
 void save_julia_var(FILE* f, std::string var_name, Point* variable, int num_vars);
-void save_julia_var(FILE* f, std::string var_name, PolyState* variable, int num_vars);
+void save_julia_var(FILE* f, std::string var_name, PolyState* variable, int num_vars, Map* map);
 void save_julia_var(FILE* f, std::string var_name, Map* variable);
 
 

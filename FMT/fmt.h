@@ -7,7 +7,7 @@
 #define FMT_fmt_h
 
 //Used to toggle debug text
-#define FMT_DEBUG
+//#define FMT_DEBUG
 #define FMT_TIMING
 //#define FMT_JULIA_DEBUG
 
@@ -16,6 +16,7 @@
 #define KNN_CON 2  // KNN (not implemented)
 
 #define FMT_ORD 3  // Sampling order. 1 => positions only, 2 => pos + vel, 3 => pos,vel,acc etc.
+#define POLY_ORD 2 // Order for polynomial fitting.
 
 #define CACHE_UNK    0  // Untested connection
 #define CACHE_FREE   1  // Tested connection, guaranteed free path
@@ -49,7 +50,6 @@ typedef struct Neighborhoods {
     uint8_t* cache;   // Whether or not the collision has been checked
     int* indices; // Indices of neighbor points
     PolyState* paths; // Polynomial paths which connect neighbors, in state space
-    int* path_segs; // Number of segments per path
     float* costs; // Costs of traveling to neighbor points
     int size;     // Number of neighbors
 } Neighborhood;
@@ -59,12 +59,12 @@ typedef struct FMT_Parameters {
     int X_limit;            // Size of box in x dimension
     int Y_limit;            // Size of box in y dimension
     int Z_limit;            // Size of box in z dimension (set to 0 for planning in 2D)
-    int X_vel_limit;        // Max vel in x dimension
-    int Y_vel_limit;        // Max vel in y dimension
-    int Z_vel_limit;        // Max vel in z dimension
-    int X_acc_limit;        // Max acc in x dimension
-    int Y_acc_limit;        // Max acc in y dimension
-    int Z_acc_limit;        // Max acc in z dimension
+    float X_vel_limit;        // Max vel in x dimension
+    float Y_vel_limit;        // Max vel in y dimension
+    float Z_vel_limit;        // Max vel in z dimension
+    float X_acc_limit;        // Max acc in x dimension
+    float Y_acc_limit;        // Max acc in y dimension
+    float Z_acc_limit;        // Max acc in z dimension
     int num_pts;            // Number of points to sample
     int connection_type;    // 1 = r-connected, 2 = k-nearest neighbors
     float connection_param; // either radius or number of neighbors
@@ -132,13 +132,14 @@ private:
     void filter(Neighborhood* filtered_neighborhood, int index, int* filter_vec,int filter_size, int exclude);
 
     // Returns cached polynomial connecting start and goal
-    PolyState get_neighborhood_poly(int start_ind, int end_ind);
+    PolyState* get_neighborhood_poly(int start_ind, int end_ind);
     
     // Printing utilities
     void print_parameters();
     void print_neighborhood(Neighborhood n);
     void print_point(Point pt);
     void print_array(int* vec, int size);
+    void plot_neighborhood(int i);
     
     // Variables:
     bool is_initialized;                        // Must be true for computation to happen

@@ -50,6 +50,7 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
     // Mark as a bad plan:
     current_plan[0].cost = -1;
     for(int j=0; j < F_DENSE_PTS+2; j++){
+        current_plan[j].cells = new size_t[MAX_POLY_CELLS];
 //        current_plan[j].x = -1;
 //        current_plan[j].y = -1;
 //        current_plan[j].z = -1;
@@ -60,6 +61,7 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
             paths[i][j].cost=-1;
             paths[i][j].cost=-1;
             paths[i][j].cost=-1;
+            paths[i][j].cells = new size_t[MAX_POLY_CELLS];
         }
     }
 
@@ -74,10 +76,10 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
             exploration_map.set(i, j, 0, MAP_UNKN);
     
     // Fast planner used most of the time
-    F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, RAD_CON, 0, &exploration_map);
+    F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, KNN_CON, 75, &exploration_map);
     f_sparse_calls = 0;
     // Slow(er) planner used when F_sparse fails
-    F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, RAD_CON, 0, &exploration_map);
+    F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, KNN_CON, 2, &exploration_map);
     f_dense_calls = 0;
 
 }
@@ -237,6 +239,27 @@ void Explorer::assign(Point* waypoint){
         }
 
         
+#ifdef EXPLORE_DEBUG
+        /*
+        printf("Path has waypoints: (incorrect if reversed)");
+        for(int seg = 0; seg <= curr_segs; seg++)
+            printf(" ( %f,%f,%f) ", current_plan[seg].coefficients_x[0], current_plan[seg].coefficients_y[0], current_plan[seg].coefficients_z[0]);
+        printf("\n");
+        
+        int k = 1;
+        printf("Coefficients of current polynomial (order %d, rev = %d):\n", current_plan[k].order,current_plan[k].reverse);
+        printf("x=[");
+        for(int i = 0;  i< current_plan[k].order; i++)
+            printf(" %f, ",current_plan[k].coefficients_x[i]);
+        printf("]\ny=[");
+        for(int i = 0;  i< current_plan[k].order; i++)
+            printf(" %f, ",current_plan[k].coefficients_y[i]);
+        printf("]\nz=[");
+        for(int i = 0;  i< current_plan[k].order; i++)
+            printf(" %f, ",current_plan[k].coefficients_z[i]);
+        printf("]\n");
+         */
+#endif
         
         if(current_plan[0].cost == -1){
             current_vel.x = 0.0; current_vel.y = 0.0; current_vel.z = 0.0;
@@ -248,6 +271,7 @@ void Explorer::assign(Point* waypoint){
             waypoint->z = swarm_locs[self_id].z;
             
         }else{ // this is looking at the next point.
+            // Only valid if reverse = false.
             waypoint->x =current_plan[1].coefficients_x[0];
             waypoint->y =current_plan[1].coefficients_y[0];
             waypoint->z =current_plan[1].coefficients_z[0];
@@ -255,9 +279,12 @@ void Explorer::assign(Point* waypoint){
         
         
         // Update velocity.
+        // This should be an acceleration controlled system.
         float dt = 0.1;
-        get_poly_der(current_plan[0], dt, &current_vel, 1);
-        get_poly_der(current_plan[0], dt, &current_acc, 2);
+        
+        get_poly_der(current_plan[1], dt, &current_acc, 2);
+        get_poly_der(current_plan[1], dt, &current_vel, 1);
+
         
         
         if(current_vel.x != current_vel.x || current_vel.y != current_vel.y || current_vel.z != current_vel.z)
@@ -266,16 +293,29 @@ void Explorer::assign(Point* waypoint){
 //            acc.x = 0.0; acc.y = 0.0; acc.z = 0.0;
 
         }else{
+            
+            // Compute the value of acceleration/velocity based on ideal physics:
+            // v(t+dt) = v(t) + a(t) dt
+            
+            
+            current_acc.x = sign(current_acc.x)*fmin(fabs(current_acc.x), MAX_ACCEL_X* (1296.0/25.0));
+            current_acc.y = sign(current_acc.y)*fmin(fabs(current_acc.y), MAX_ACCEL_Y* (1296.0/25.0));
 
+//            current_vel.x += current_acc.x*dt;
+//            current_vel.y += current_acc.y*dt;
+            current_vel.x = sign(current_vel.x)*fminf(fabs(current_vel.x), MAX_VEL_X*36.0/5.0);
+            current_vel.y = sign(current_vel.y)*fminf(fabs(current_vel.y), MAX_VEL_X*36.0/5.0);
+            
+//            current_vel.z += fmax(current_acc.x, MAX_ACCEL_Z*sign(current_acc.x))*dt;
+
+            
             F_sparse->set_initial_state(&current_vel, &current_acc);
             F_dense->set_initial_state(&current_vel, &current_acc);
         }
         if(self_id >= 0){
+            printf("Pos%d = (%f,%f,%f)\n",self_id, swarm_locs[self_id].x,swarm_locs[self_id].y,swarm_locs[self_id].z);
             printf("V%d = %f\n",self_id, norm(current_vel)*5.0/36.0);
-        }
-        
-        if(self_id >= 0){
-            printf("A%d = %f\n",self_id, norm(current_acc)*25.0/(36.0*36.0));
+            printf("A%d = %f\n",self_id, norm(current_acc)*25.0/(1296.0));
         }
         
 #ifdef EXPLORE_DEBUG

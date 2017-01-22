@@ -17,7 +17,7 @@
 #include <string>
 class Explorer;
 
-//#define SIM_DEBUG
+#define SIM_DEBUG
 //#define SIM_PLOT
 
 #define MAX_NUM_AGENTS  32

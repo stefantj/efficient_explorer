@@ -25,6 +25,13 @@
 #define F_SPARSE_PTS    400
 #define F_DENSE_PTS     1024
 
+#define MAX_VEL_X       5.0
+#define MAX_ACCEL_X     2.0
+#define MAX_VEL_Y       5.0
+#define MAX_ACCEL_Y     2.0
+#define MAX_VEL_Z       0.5
+#define MAX_ACCEL_Z     0.3
+
 //#define EXPLORE_DEBUG
 //#define EXPLORE_STATUS
 //#define EXPLORE_TIMING
@@ -62,6 +69,9 @@ public:
     int get_clusters(Point* cluster_centroids, float* costs, int max_num_clusters);
     void get_neighbor_clusters(int agent_id, Point* cluster_centroids, float* costs, int n_clusters);
     
+    Point current_vel;
+    Point current_acc;
+    
     PolyState current_plan[F_DENSE_PTS+2];    // Holds the current plan <- memory hog.
     int curr_segs;                            // Number of segments in current plan
 private:
@@ -94,8 +104,6 @@ private:
     PolyState paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals
     int path_segs[MAX_CLUSTERS]; // Holds the length of the segments
     
-    Point current_vel;
-    Point current_acc;
     
     //Map for exploration
     Map exploration_map;

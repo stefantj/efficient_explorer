@@ -2,8 +2,8 @@
 //  smoother.h
 //  FMT
 //
-//  Created by Megamind on 8/25/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 #ifndef __FMT__smoother__

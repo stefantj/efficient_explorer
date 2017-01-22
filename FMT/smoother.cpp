@@ -2,8 +2,8 @@
 //  smoother.cpp
 //  FMT
 //
-//  Created by Megamind on 8/25/16.
-//  Copyright (c) 2016 ASL. All rights reserved.
+//  Created by Stefan Jorgensen
+//  MIT licence
 //
 
 #include "smoother.h"
@@ -153,6 +153,8 @@ int PathSmoother::smooth_path(Point* path, Point* v_init, Point* a_init, Point* 
         // Form Hessian for given time:
             form_Q(T_split[num_points-1]);
         }
+    
+    
     // Form A matrix: //
         double constraint_times[degree];
         int constraint_order[degree];
@@ -344,7 +346,6 @@ void PathSmoother::form_Q(double time){
         }
     }
 }
-
 
 void PathSmoother::test_smoother(){
     // Make a point path:

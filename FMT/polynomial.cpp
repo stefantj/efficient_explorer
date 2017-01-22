@@ -203,17 +203,29 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
     
     
     //   Evaluate the polynomial to get the cells it intersects (replace this with trevor's code):
-    double dt = 0.1;
+    double dt = 0.01;
     int num_cells = 0;
+    p->cost = 0;
+    p->reverse = false;
     size_t cell_list[MAX_POLY_CELLS]={0};
+    Point prev_loc;
+    Point t_loc;
+
     for(double t = 0; t < p->duration && num_cells < MAX_POLY_CELLS; t+=dt){
+        if(t >= dt){
+            prev_loc.x = t_loc.x;
+            prev_loc.y = t_loc.y;
+            prev_loc.z = t_loc.z;
+        }
+
         // Evaluate polynomial at time t
-        Point t_loc;
         t_loc.x=p->coefficients_x[0];
         t_loc.y=p->coefficients_y[0];
         t_loc.z=p->coefficients_z[0];
 
-
+        if(t >= dt)
+            p->cost += dist(t_loc, prev_loc);
+        
         double t_pow = t;
         for(int k = 1; k < p->order; k++){
             t_loc.x += t*p->coefficients_x[k];
@@ -223,9 +235,20 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
             if(t_pow != t_pow)
                 printf("Error: time overflow");
         }
+        
+        // THIS IS A HACK! Don't return a good value if we go out of bounds.
+        if(t_loc.x < XMIN || t_loc.x > XMAX || t_loc.y < YMIN || t_loc.y > YMAX){
+            p->num_cells = 0;
+            
+            return MAXFLOAT;
+        }
 
         // Ask map for cell location
         size_t cell_id = map->pt2num(t_loc);
+        
+//        Point testpt;
+//        map->num2ind(&testpt, cell_id);
+//        printf(" (%f,%f,%f) => (%f,%f,%f)\n", t_loc.x,t_loc.y,t_loc.z,testpt.x,testpt.y,testpt.z);
 //        printf("t = %.2f: Checking (%.2f,%.2f,%.2f): at %lu\n", t,t_loc.x,t_loc.y,t_loc.z,cell_id);
         
         // Needs to handle error case better.
@@ -260,7 +283,8 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
         }
         // Put into p
         if(ind_smallest == -1){
-
+            if(num_cells > 0)
+                printf("Error - no minimum when the list is non-empty (polyfitting)\n");
         }else{
             if(ind_smallest >= num_cells || p->num_cells >= MAX_POLY_CELLS){
                 printf("Smallest index out of bounds!");
@@ -274,15 +298,7 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
         }
     }
     
-
-    //   Store coefficients, duration, list of unique cells, number of cells and set reverse = false
-
-    
-    print_poly_state_julia(*p, init, num_init, final, num_final);
-
-    
-    
-    return 0.0;
+    return p->cost;
 }
 
 

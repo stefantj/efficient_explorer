@@ -13,7 +13,7 @@
 
 Simulator::Simulator(){
     delta_time = 0.1;
-    plot_delay = 100;
+    plot_delay = 1;
 }
 
 void Simulator::init_video_file(FILE* f){
@@ -34,7 +34,21 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
     
     for(int i =0; i < num_agents; i++){
         if(agents[i].planner->curr_segs > 0){
-            fprintf(f,"plot(trajectory_%d[2:end,1], trajectory_%d[2:end,2], color=:red, linestyle=\"-.\");\n",i,i);
+            for(int k = 1; k <= agents[i].planner->curr_segs; k++){
+                // evaluate and plot polynomial segment k
+                fprintf(f,"times = linspace(0,trajectory_%d_%d_duration,1000);\n", i,k);
+                fprintf(f,"px = zeros(times); py = zeros(times); pz = zeros(times);\n");
+                fprintf(f,"for k=1:size(trajectory_%d_x_%d,1)\n", i, k);
+                fprintf(f,"    px += trajectory_%d_x_%d[k]*times.^(k-1)\n", i,k);
+                fprintf(f,"    py += trajectory_%d_y_%d[k]*times.^(k-1)\n", i,k);
+                fprintf(f,"end\n");
+                fprintf(f,"plot(px,py,color=:red, linestyle=\"-.\");\n");
+
+                // Plot the cells checked:
+                fprintf(f, "plot(trajectory_%d_x_cp_%d, trajectory_%d_y_cp_%d,color=:yellow,linestyle=\":\");\n", i,k,i,k);
+                fprintf(f, "plot(trajectory_%d_x_v_%d, trajectory_%d_y_v_%d, color=:green);\n", i,k,i,k);
+
+            }
         }
         for(int j = 0; j < num_agents; j++){
             if(i > 0 && comms[j][i] == true){
@@ -69,10 +83,13 @@ void Simulator::run_simulator(int iters, int team_size){
     }
 
     // Make map:
+    Map plot_map;
+    
     true_map.X_dim = 400;
     true_map.Y_dim = 300;
     true_map.Z_dim = 1;
     true_map.data  = new char[400*300*1];
+
     global_map.X_dim = 400;
     global_map.Y_dim = 300;
     global_map.Z_dim = 1;
@@ -87,10 +104,17 @@ void Simulator::run_simulator(int iters, int team_size){
             }else{
                 printf("Warning: Map has invalid value %f at (%d,%d)\n", map[0][i][j], i,j);
             }
+            
+//            true_map.set(i,j,0,MAP_FREE);
+            
         }
     }
     
-    
+    plot_map.X_dim = true_map.X_dim;
+    plot_map.Y_dim = true_map.Y_dim;
+    plot_map.Z_dim = true_map.Z_dim;
+    plot_map.data  = new char[400*300*1];
+
     
     
     /*
@@ -177,12 +201,12 @@ void Simulator::run_simulator(int iters, int team_size){
 
     for(int i = 0; i < num_agents; i++){
         printf("Making agent %d\n",i);
-        agents[i].location.x = 4.0 +(i/2)*7.0;
-        agents[i].location.y = 4.0 +(i%2)*7.0;
+        agents[i].location.x = 10.0 +(i/2)*7.0;
+        agents[i].location.y = 10.0 +(i%2)*7.0;
         agents[i].location.z = 0;
         agents[i].bearing = M_PI;
         agents[i].target.x = 300.0;
-        agents[i].target.y = 300.0;
+        agents[i].target.y = 200.0;
         agents[i].target.z = 0.0;
         agents[i].planner = new Explorer(i, true_map.X_dim, true_map.Y_dim);
 
@@ -286,7 +310,7 @@ void Simulator::run_simulator(int iters, int team_size){
             agents[i].planner->update_state(agent_location_buffer[i], num_agents);
             
         }
-        // Raytrace to get them measurements
+        // Raytrace to get the measurements
         for(int i = 0; i < num_agents; i++){
             raytrace(i);
         }
@@ -363,11 +387,29 @@ void Simulator::run_simulator(int iters, int team_size){
             save_julia_var(datafile, std::string("locations"),true_location_buffer , num_agents);
             save_julia_var(datafile, std::string("targets"),agent_targets_buffer, num_agents);
             
-//           for(int i = 0; i < num_agents; i++){
-//               sprintf(filename, "trajectory_%d", i);
-//                save_julia_var(datafile, std::string(filename), agents[i].planner->current_plan, int(agents[i].planner->curr_segs));
-//            }
+           for(int i = 0; i < num_agents; i++){
+               sprintf(filename, "trajectory_%d", i);
+                save_julia_var(datafile, std::string(filename), agents[i].planner->current_plan, int(agents[i].planner->curr_segs), &true_map);
+            }
+            
+           
             if(iteration%plot_delay == 0){
+                // Copy global map data
+/*                for(int i = 0; i < plot_map.X_dim*plot_map.Y_dim; i++){
+                    plot_map.data[i] = true_map;//global_map.data[i];
+                }
+                
+                // Mark where current trajectory is supposed to be checked:
+                for(int i = 0; i < num_agents; i++){
+                    if(agents[i].planner != NULL){
+                        for(int seg = 1; seg <= agents[i].planner->curr_segs; seg++){
+                            
+                            for(int cell = 0; cell < agents[i].planner->current_plan[seg].num_cells; cell++)
+                                plot_map.data[agents[i].planner->current_plan[seg].cells[cell]] = MAP_FREE;
+                        }
+                    }
+                }
+  */
                 save_julia_var(datafile, std::string("global_map"), &global_map);
             }
         }
@@ -440,50 +482,9 @@ void Simulator::run_simulator(int iters, int team_size){
 
 
 void Simulator::move_base(int agent){
-    // Try using smoothed paths:
-    // First, scale time:
-    if(agents[agent].target.x == agents[agent].target.x)
-       agents[agent].location.x = agents[agent].target.x;
-    if(agents[agent].target.y == agents[agent].target.y)
-       agents[agent].location.y = agents[agent].target.y;
-    if(agents[agent].target.z == agents[agent].target.z)
-       agents[agent].location.z = agents[agent].target.z;
-       
-       
-
-    /*
-#ifdef SIM_DEBUG
-    Point old_loc;
-    old_loc.x = agents[agent].location.x;
-    old_loc.y = agents[agent].location.y;
-    old_loc.z = agents[agent].location.z;
-#endif
-    
-    float speed_limit = 2*delta_time;
-    float grid_vel = dist(agents[agent].location, agents[agent].target);
-    if(grid_vel == 0){
-        return;
-    }
-    float dx = (agents[agent].target.x - agents[agent].location.x)/grid_vel;
-    float dy = (agents[agent].target.y - agents[agent].location.y)/grid_vel;
-    float dz = (agents[agent].target.z - agents[agent].location.z)/grid_vel;
-    
-    // Scale to be proper speed for sim:
-    if(grid_vel*5.0/36.0 > speed_limit)
-        grid_vel = (36.0/5.0)*speed_limit;
-    
-    agents[agent].bearing = atan2f(dy, dx);
-    
-    agents[agent].location.x += dx*grid_vel;
-    agents[agent].location.y += dy*grid_vel;
-    agents[agent].location.z += dz*grid_vel;
-#ifdef SIM_DEBUG
-    printf("Deltas are %f %f %f. Grid velocity is %f ", dx,dy,dz,grid_vel);
-    printf("Moved agent %f distance\n", dist(agents[agent].location, old_loc));
-#endif
-    */
-    
-    
+    // Move according to integrated velocity and acceleration
+    agents[agent].location.x += (agents[agent].planner->current_vel.x)*delta_time + 0.5*(agents[agent].planner->current_acc.x)*(delta_time*delta_time);
+    agents[agent].location.y += (agents[agent].planner->current_vel.y)*delta_time + 0.5*(agents[agent].planner->current_acc.y)*(delta_time*delta_time);
 }
 
 

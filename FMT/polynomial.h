@@ -14,6 +14,11 @@
 
 #define POLY_DEBUG
 
+#define XMIN 0
+#define XMAX 400
+#define YMIN 0
+#define YMAX 300
+
 
 void print_poly_state(PolyState p);
 void print_poly_state_julia(PolyState p, Point* init, int num_init, Point* final, int num_final);
