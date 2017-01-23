@@ -126,9 +126,10 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
         }
     }
     
+#ifdef FMT_DEBUG
     printf(" Maximum number of cells used: %d. Maximum allocated: %d\n", max_num_cells, MAX_POLY_CELLS);
     printf(" Average number of cells used: %f. Wasted allocation: %f\n", mean_cells, (MAX_POLY_CELLS-mean_cells)*cells_count);
-    
+#endif
     
     
     
@@ -755,7 +756,7 @@ bool FMT::compute_neighborhood(Point pt, int index, Map* map){
                         break;
                     }
                 }
-                collision_value=false;
+//                collision_value=false;
                 
                 if(!collision_value){
                     // Add to neighbor list
@@ -898,7 +899,7 @@ bool FMT::compute_neighborhood(Point pt, int index, Map* map){
             }
         }
 
-        delete p.cells;
+        delete [] p.cells;
         
         return true;
 
@@ -1034,7 +1035,7 @@ bool FMT::compute_neighborhoods(Map* map_structure){
             }
         }
         
-        delete p.cells;
+        delete [] p.cells;
         
         return true;
     }else{

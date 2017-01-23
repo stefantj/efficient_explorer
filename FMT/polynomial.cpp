@@ -191,19 +191,22 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
     */
     
     
-    
+#ifdef POLY_DEBUG
     for(int k =0; k < p->order; k++){
-        if(p->coefficients_x[k] != p->coefficients_x[k])
-            printf("Error: x coeff overflowed for degree %d\n",k);
-        if(p->coefficients_y[k] != p->coefficients_y[k])
-            printf("Error: y coeff overflowed for degree %d\n",k);
-        if(p->coefficients_z[k] != p->coefficients_z[k])
-            printf("Error: z coeff overflowed for degree %d\n",k);
+        if(p->coefficients_x[k] != p->coefficients_x[k]){
+            printf("Error: x coeff overflowed for degree %d\n",k); p->cost = MAXFLOAT; return -1;
+        }
+        if(p->coefficients_y[k] != p->coefficients_y[k]){
+            printf("Error: y coeff overflowed for degree %d\n",k); p->cost = MAXFLOAT; return -1;
+        }
+        if(p->coefficients_z[k] != p->coefficients_z[k]){
+            printf("Error: z coeff overflowed for degree %d\n",k); p->cost = MAXFLOAT; return -1;
+        }
     }
-    
+#endif
     
     //   Evaluate the polynomial to get the cells it intersects (replace this with trevor's code):
-    double dt = 0.01;
+    double dt = 0.1;
     int num_cells = 0;
     p->cost = 0;
     p->reverse = false;
@@ -228,9 +231,9 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
         
         double t_pow = t;
         for(int k = 1; k < p->order; k++){
-            t_loc.x += t*p->coefficients_x[k];
-            t_loc.y += t*p->coefficients_y[k];
-            t_loc.z += t*p->coefficients_z[k];
+            t_loc.x += t_pow*p->coefficients_x[k];
+            t_loc.y += t_pow*p->coefficients_y[k];
+            t_loc.z += t_pow*p->coefficients_z[k];
             t_pow *= t;
             if(t_pow != t_pow)
                 printf("Error: time overflow");
@@ -343,6 +346,8 @@ void PolynomialSmoother::householder_Ldiv(double A[][MAX_ORDER], int ai_off, int
     }
     
     double v_k[a_sizei];
+    for(int k = 0; k < a_sizei; k++)
+        v_k[k] = 0.0;
     
     for(int k = 0; k < a_sizej; k++){
         // Form v_k:

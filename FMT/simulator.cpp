@@ -13,7 +13,7 @@
 
 Simulator::Simulator(){
     delta_time = 0.1;
-    plot_delay = 1;
+    plot_delay = 500;
 }
 
 void Simulator::init_video_file(FILE* f){
@@ -45,7 +45,8 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
                 fprintf(f,"plot(px,py,color=:red, linestyle=\"-.\");\n");
 
                 // Plot the cells checked:
-                fprintf(f, "plot(trajectory_%d_x_cp_%d, trajectory_%d_y_cp_%d,color=:yellow,linestyle=\":\");\n", i,k,i,k);
+                fprintf(f, "scatter(trajectory_%d_x_cp_%d, trajectory_%d_y_cp_%d,color=:yellow,marker=\"s\");\n", i,k,i,k);
+                // Plot the line planned to follow
                 fprintf(f, "plot(trajectory_%d_x_v_%d, trajectory_%d_y_v_%d, color=:green);\n", i,k,i,k);
 
             }
@@ -410,7 +411,7 @@ void Simulator::run_simulator(int iters, int team_size){
                     }
                 }
   */
-                save_julia_var(datafile, std::string("global_map"), &global_map);
+                save_julia_var(datafile, std::string("global_map"), &true_map);
             }
         }
         fclose(datafile);
@@ -483,8 +484,11 @@ void Simulator::run_simulator(int iters, int team_size){
 
 void Simulator::move_base(int agent){
     // Move according to integrated velocity and acceleration
-    agents[agent].location.x += (agents[agent].planner->current_vel.x)*delta_time + 0.5*(agents[agent].planner->current_acc.x)*(delta_time*delta_time);
-    agents[agent].location.y += (agents[agent].planner->current_vel.y)*delta_time + 0.5*(agents[agent].planner->current_acc.y)*(delta_time*delta_time);
+//    agents[agent].location.x += (agents[agent].planner->current_vel.x)*delta_time + 0.5*(agents[agent].planner->current_acc.x)*(delta_time*delta_time);
+//    agents[agent].location.y += (agents[agent].planner->current_vel.y)*delta_time + 0.5*(agents[agent].planner->current_acc.y)*(delta_time*delta_time);
+    
+    // Move according to ideal path following:
+    get_poly_der((agents[agent].planner->current_plan[1]), delta_time, &(agents[agent].location), 0);
 }
 
 

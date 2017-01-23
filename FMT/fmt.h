@@ -16,7 +16,7 @@
 #define KNN_CON 2  // KNN (not implemented)
 
 #define FMT_ORD 3  // Sampling order. 1 => positions only, 2 => pos + vel, 3 => pos,vel,acc etc.
-#define POLY_ORD 2 // Order for polynomial fitting.
+#define POLY_ORD 3 // Order for polynomial fitting.
 
 #define CACHE_UNK    0  // Untested connection
 #define CACHE_FREE   1  // Tested connection, guaranteed free path

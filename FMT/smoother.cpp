@@ -158,7 +158,8 @@ int PathSmoother::smooth_path(Point* path, Point* v_init, Point* a_init, Point* 
     // Form A matrix: //
         double constraint_times[degree];
         int constraint_order[degree];
-        con_ind = 0;
+//        con_ind = 0;
+// TODO: Double check this
         for(int k =0; k < num_points-1; k++){
             constraint_times[k] = T_split[k+1];
             constraint_order[k] = 0;
@@ -456,6 +457,8 @@ void PathSmoother::householder_Ldiv(double A[][MAX_DEGREE], int ai_off, int aj_o
     }
     
     double v_k[a_sizei];
+    for(int k = 0; k < a_sizei; k++)
+        v_k[k] = 0.0;
     
     for(int k = 0; k < a_sizej; k++){
         // Form v_k:

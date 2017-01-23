@@ -12,7 +12,7 @@
 #include <iostream>
 #include "utilities.h"
 
-#define POLY_DEBUG
+//#define POLY_DEBUG
 
 #define XMIN 0
 #define XMAX 400

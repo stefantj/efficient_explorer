@@ -18,13 +18,12 @@
  
  FMT issues:
  > Collision checking does not seem to do anything
- > Polynomial paths returned as `good' do not seem good at all. Might be adding an extra segment to the visualization
+ > Might be adding an extra segment to the visualization
  > Planner does not compensate for drift
  > Collision checking should be split into cached (for pre-generated tree) and on-line (for start/end connections). Cacheing the on-line portion is actually more expensive.
  
  Explorer issues:
  > Seeing switching behavior again
- > Huge waste of memory in current implementation
  > Consider dynamic allocation for items with a large footprint (e.g. polyPath)
  
  Simulator issues:
@@ -34,7 +33,9 @@
  Current focus:
  **************
  
-    Need to verify that the right cells are checked. Seems like collision checking is largely irrelevant to the paths chosen.
+    Seems like collision checking is largely irrelevant to the paths chosen.
+ 
+    Coefficient overflows are strange - look into this. Consider replacing the current stepping code with calls to `get_poly_der'?
  
     Really should look into the drift version of FMT
 
@@ -43,6 +44,10 @@
  ********
  Comments
  ********
+ 
+ (POLY) Timing is _extremely_ sensitive to the dt parameter in the path checking. See other note about not cacheing the on-line paths.
+ 
+ (POLY) Look into `garbage value' claims by the analyzer. I think everything is ok, but check anyway.
  
  (ALL) Reduce memory footprint:
  > MAX_POLY_CELLS is too small to be conservative (there are paths which use all of it), but at the same time the average path only uses half of the bytes. This wastes 65k for the small graph and 1.6M for the larger one. Significant, but not huge
@@ -62,8 +67,6 @@
  (POLY/UTILS) Should make polystate a class with a copy constructor? Right now just have a copy function.
 
  (FMT/POLY) Reconsider global MAX_POLY_CELLS in favor of dynamic allocation. Current practice leads to a lot of memory footprint.
- 
- (FMT) Check whether there is a memory leak in reset_neighborhood. Might be an issue with the cells list by `delete by forgetting' approach.
  
  (POLY) Still something funky with path costs, but it seems like polyfmt is sort of working now.
  

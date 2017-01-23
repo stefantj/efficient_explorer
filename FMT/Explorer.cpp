@@ -47,16 +47,13 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
     }
 
     
-    // Mark as a bad plan:
-    current_plan[0].cost = -1;
+    // Initialize plans:
     for(int j=0; j < F_DENSE_PTS+2; j++){
         current_plan[j].cost = -1;
         current_plan[j].cells = new size_t[MAX_POLY_CELLS];
-    }
-    
-    for(int i = 0; i < F_DENSE_PTS+2; i++){
-            tmp_path[i].cost=-1;
-            tmp_path[i].cells = new size_t[MAX_POLY_CELLS];
+        
+        tmp_path[j].cost=-1;
+        tmp_path[j].cells = new size_t[MAX_POLY_CELLS];
     }
 
     exploration_map.X_dim = map_x;
@@ -87,8 +84,10 @@ Explorer::~Explorer(){
     }
     
     for(int i = 0; i < F_DENSE_PTS+2; i++){
-        delete [] current_plan[i].cells;
-        delete [] tmp_path[i].cells;
+        if( current_plan[i].cells != nullptr)
+            delete [] current_plan[i].cells;
+        if( tmp_path[i].cells != nullptr)
+            delete [] tmp_path[i].cells;
     }
     delete [] frontiers;
     delete[] cluster_ids;
