@@ -38,7 +38,7 @@ public:
     
 private:
     void raytrace(int agent);
-    void move_base(int agent);
+    void move_base(int agent, int step);
     
     void init_video_file(FILE* f);
     void print_video_file(FILE* f, std::string filename, float time);
@@ -55,6 +55,7 @@ private:
     
     float delta_time;
     int plot_delay;
+    int replan_delay;
     int num_agents;
     
     bool comms[MAX_NUM_AGENTS][MAX_NUM_AGENTS];

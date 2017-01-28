@@ -469,7 +469,9 @@ void PathSmoother::householder_Ldiv(double A[][MAX_DEGREE], int ai_off, int aj_o
             if(i>0) // Skip first element to microoptimize..
                 normv += (v_k[i])*(v_k[i]);
         }
-        v_k[0] += (1-2*(v_k[0]<0))*sqrtf(normv + v_k[0]*v_k[0]);
+//        v_k[0] += (1-2*(v_k[0]<0))*sqrtf(normv + v_k[0]*v_k[0]);
+
+        v_k[0] += sign(v_k[0])*sqrtf(normv + v_k[0]*v_k[0]);
         normv = sqrtf(normv + v_k[0]*v_k[0]);
         for(int i =0; i < v_size; i++)
             v_k[i] /= normv;

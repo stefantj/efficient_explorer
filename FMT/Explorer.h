@@ -22,7 +22,7 @@
 #define MAX_CLUSTERS    256
 #define MAX_CLUSTERSIZE 1048
 #define MAX_TEAMSIZE    32
-#define F_SPARSE_PTS    400
+#define F_SPARSE_PTS    254
 #define F_DENSE_PTS     1024
 
 #define MAX_VEL_X       5.0
@@ -53,7 +53,7 @@ public:
     // Planning functions
     bool cluster_frontiers();
     int  compute_costs();
-    void compute_cost(Point start, Point goal, PolyState* path, int goal_num);
+    void compute_cost(Point start, Point goal,Point goal_vel, PolyState* path, int goal_num);
 //    void compute_cost(Point start, Cluster* goal, Point* path, int goal_num);
     void assign(Point* waypoint);
     
@@ -71,6 +71,7 @@ public:
     
     Point current_vel;
     Point current_acc;
+    Point target;
     
     PolyState current_plan[F_DENSE_PTS+2];    // Holds the current plan <- memory hog.
     int curr_segs;                            // Number of segments in current plan
@@ -99,6 +100,7 @@ private:
 
     float goal_costs[MAX_TEAMSIZE][MAX_CLUSTERS];
     Point goal_locations[MAX_CLUSTERS]; // Holds the goal locations of the swarm
+
     int num_goals;                      // Holds the number of goals for the swarm
     
 //    PolyState paths[MAX_CLUSTERS][F_DENSE_PTS+2];     // Holds the paths to goals

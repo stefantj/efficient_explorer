@@ -10,6 +10,7 @@
 //#define FMT_DEBUG
 #define FMT_TIMING
 //#define FMT_JULIA_DEBUG
+//#define FMT_WARNING
 
 // Connection types
 #define RAD_CON 1  // Radial
@@ -87,8 +88,10 @@ public:
     FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, float connection_param, Map* map_structure);
     
     /*** Planning methods ***/
-    //Plan with a fresh instance
     int fmtstar(Point start, Point goal, Map* map, PolyState* path);
+
+    //Plan with a fresh instance
+    int fmtstar(Point start, Point goal,  Point goal_vel, Map* map, PolyState* path);
     
     // Clears cached collision checks
     void clear_cache();
@@ -115,21 +118,25 @@ private:
     void sample_points();
     
     // Compute single neighborhood for given point at index
-    bool compute_neighborhood(Point pt, int index, Map* map);
+    bool compute_neighborhood(int index, Map* map, bool rev=false);
     
     // Undoes work of compute_neighborhood(Point pt, int index)
     // resets the state
     bool reset_neighborhood(int index);
 
     // Compute neighborhoods for sampled points
-    bool compute_neighborhoods(Map* map_structure);
+    bool initialize_neighborhoods(Map* map_structure);
     
     // Return true if points[index] is within goal region
     bool is_goal_pt(int index);
 
     
-    // Returns elements in a neighborhood which are in another list.
-    void filter(Neighborhood* filtered_neighborhood, int index, int* filter_vec,int filter_size, int exclude);
+    // Returns elements in a forward neighborhood which are in another list.
+    void filterF(Neighborhood* filtered_neighborhood, int index, int* filter_vec,int filter_size, int exclude);
+    
+    // Returns elements in a reverse neighborhood which are in another list.
+    void filterR(Neighborhood* filtered_neighborhood, int index, int* filter_vec,int filter_size, int exclude);
+
 
     // Returns cached polynomial connecting start and goal
     PolyState* get_neighborhood_poly(int start_ind, int end_ind);
@@ -149,7 +156,8 @@ private:
     int goal_pt_ind;                            // Helper for endpt index
     FMT_Point* points;                          // Sampled points
     int max_neighborhood_size;
-    Neighborhood* neighborhoods;                // Neighborhoods of sampled points
+    Neighborhood* neighborhoodsF;                // Forward Neighborhoods of sampled points
+    Neighborhood* neighborhoodsR;                // Reverse Neighborhoods of sampled points
     
     // Containers used for planning. Put them here so we only allocate memory once
     int* Windex;

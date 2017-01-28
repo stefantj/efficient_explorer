@@ -82,6 +82,14 @@ int find_element(int* collection, int collection_size, int element){
     
 }
 
+int linear_search(int* collection, int collection_size, int element){
+    for(int i =0; i < collection_size; i++){
+        if(collection[i] == element)
+            return i;
+    }
+    return -1;
+}
+
 // Removes integer element from a collection
 int remove_element(int* collection, int collection_size, int element)
 {
@@ -280,15 +288,14 @@ void save_julia_var(FILE* f, std::string var_name, PolyState* variable, int num_
 
 void save_julia_var(FILE* f, std::string var_name, Map* variable){
     fprintf(f, "%s = [", var_name.c_str());
-    int code = 0;
     for(int i = 0; i < variable->X_dim; i++){
         for(int j = 0; j < variable->Y_dim; j++){
             if((*variable)(i,j,0) == MAP_UNKN){
-                code = fprintf(f, "%.1f ", 0.5);
+                fprintf(f, "%.1f ", 0.5);
             }else if((*variable)(i,j,0) >= MAP_OCC_THRESH){
-                code = fprintf(f, "%d ", 1);
+                fprintf(f, "%d ", 1);
             }else{
-                code = fprintf(f, "%d ",0);
+                fprintf(f, "%d ",0);
             }
         }
         if(i+1 < variable->X_dim)

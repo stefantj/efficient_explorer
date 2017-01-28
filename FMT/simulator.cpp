@@ -12,8 +12,9 @@
 #include "afghan_village.h"
 
 Simulator::Simulator(){
-    delta_time = 0.1;
-    plot_delay = 500;
+    delta_time = 1;
+    plot_delay = 5;
+    replan_delay = 1;
 }
 
 void Simulator::init_video_file(FILE* f){
@@ -25,6 +26,7 @@ void Simulator::init_video_file(FILE* f){
 
 void Simulator::print_video_file(FILE* f, std::string filename, float time){
     fprintf(f, "include(\"%s.jl\")\n", filename.c_str());
+    fprintf(f, "colors = [:yellow, :orange];\n");
     fprintf(f, "figure(1, figsize=(16,16));clf(); axis([0,400,0,300]);\n");
  //   fprintf(f, "imshow(afghan_map', cmap=\"gray\", interpolation=\"none\");\n");
     fprintf(f,"imshow(global_map', cmap=\"gray\", interpolation=\"none\");\n");
@@ -45,7 +47,7 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
                 fprintf(f,"plot(px,py,color=:red, linestyle=\"-.\");\n");
 
                 // Plot the cells checked:
-                fprintf(f, "scatter(trajectory_%d_x_cp_%d, trajectory_%d_y_cp_%d,color=:yellow,marker=\"s\");\n", i,k,i,k);
+                fprintf(f, "scatter(trajectory_%d_x_cp_%d, trajectory_%d_y_cp_%d,color=colors[%d],marker=\"s\");\n", i,k,i,k, (k-1)%2+1);
                 // Plot the line planned to follow
                 fprintf(f, "plot(trajectory_%d_x_v_%d, trajectory_%d_y_v_%d, color=:green);\n", i,k,i,k);
 
@@ -202,8 +204,8 @@ void Simulator::run_simulator(int iters, int team_size){
 
     for(int i = 0; i < num_agents; i++){
         printf("Making agent %d\n",i);
-        agents[i].location.x = 10.0 +(i/2)*7.0;
-        agents[i].location.y = 10.0 +(i%2)*7.0;
+        agents[i].location.x = 4.0 +(i/2)*7.0;
+        agents[i].location.y = 4.0 +(i%2)*7.0;
         agents[i].location.z = 0;
         agents[i].bearing = M_PI;
         agents[i].target.x = 300.0;
@@ -306,6 +308,7 @@ void Simulator::run_simulator(int iters, int team_size){
                 }
             }
         }
+        
         // Agents need to get their measurements first.
         for(int i = 0; i < num_agents; i++){
             agents[i].planner->update_state(agent_location_buffer[i], num_agents);
@@ -338,12 +341,16 @@ void Simulator::run_simulator(int iters, int team_size){
             }
         }
 
-        // Have them assign, returning target waypoint
-        for(int i = 0; i < num_agents; i++){
-            t_0 = timeNow();
-            agents[i].planner->assign(&agents[i].target);
-            assign_times[iteration]+=float(duration(timeNow()-t_0)/num_agents);
+        if(iteration%replan_delay == 0){
+            // Have them assign, returning target waypoint
+            for(int i = 0; i < num_agents; i++){
+                t_0 = timeNow();
+                agents[i].planner->assign(&agents[i].target);
+                assign_times[iteration]+=float(duration(timeNow()-t_0)/num_agents);
+            }
         }
+        
+        
 #ifdef SIM_DEBUG
         printf("Saving datafiles\n");
 #endif
@@ -411,7 +418,7 @@ void Simulator::run_simulator(int iters, int team_size){
                     }
                 }
   */
-                save_julia_var(datafile, std::string("global_map"), &true_map);
+                save_julia_var(datafile, std::string("global_map"), &global_map);
             }
         }
         fclose(datafile);
@@ -441,7 +448,7 @@ void Simulator::run_simulator(int iters, int team_size){
         
         // Send agents toward their target destination:
         for(int i = 0; i < num_agents; i++)
-            move_base(i);
+            move_base(i, 1+iteration%replan_delay);
         
         if(done){
             printf("Exploration complete!\n");
@@ -482,13 +489,34 @@ void Simulator::run_simulator(int iters, int team_size){
 }
 
 
-void Simulator::move_base(int agent){
+void Simulator::move_base(int agent, int step){
     // Move according to integrated velocity and acceleration
 //    agents[agent].location.x += (agents[agent].planner->current_vel.x)*delta_time + 0.5*(agents[agent].planner->current_acc.x)*(delta_time*delta_time);
 //    agents[agent].location.y += (agents[agent].planner->current_vel.y)*delta_time + 0.5*(agents[agent].planner->current_acc.y)*(delta_time*delta_time);
     
+    float poly_time = delta_time*step;
+    int rs=1;
+    while(poly_time > agents[agent].planner->current_plan[rs].duration){
+        poly_time -= agents[agent].planner->current_plan[rs].duration;
+        rs+=1;
+        if(rs > agents[agent].planner->curr_segs+1){
+            rs--;
+            poly_time = agents[agent].planner->current_plan[rs].duration;
+            break;
+        }
+    }
+    printf("Moving to t=%f of segment %d, which has duration %f\n", poly_time, rs, agents[agent].planner->current_plan[rs].duration);
+    
+    // I'm impatient...
+//    poly_time = (agents[agent].planner->current_plan[rs]).duration/2.0;
+    
     // Move according to ideal path following:
-    get_poly_der((agents[agent].planner->current_plan[1]), delta_time, &(agents[agent].location), 0);
+    get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].location), 0);
+    get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].planner->current_vel), 1);
+    get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].planner->current_acc), 2);
+
+    agents[agent].bearing = atan2f(agents[agent].planner->current_vel.y, agents[agent].planner->current_vel.x);
+    
 }
 
 

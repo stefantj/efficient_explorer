@@ -105,6 +105,7 @@ int remove_element(int* collection, int collection_size, int element);
 
 // Returns index of element. Returns -1 if not found.
 int find_element(int* collection, int collection_size, int element);
+int linear_search(int* collection, int collection_size, int element);
 
 // Joins two sorted sets and puts the union into set1
 int join_sets(int* set1, int set1_size, int* set2, int set2_size);

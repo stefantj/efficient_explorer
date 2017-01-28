@@ -243,7 +243,7 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
         if(t_loc.x < XMIN || t_loc.x > XMAX || t_loc.y < YMIN || t_loc.y > YMAX){
             p->num_cells = 0;
             
-            return MAXFLOAT;
+            return -1;
         }
 
         // Ask map for cell location
@@ -300,6 +300,9 @@ float PolynomialSmoother::fit_polynomial(PolyState* p, Point* init, int num_init
             num_cells--;
         }
     }
+    // If we've overrun the number of cells, ignore.
+    if(p->num_cells == MAX_POLY_CELLS)
+        p->cost = -1;
     
     return p->cost;
 }
@@ -448,10 +451,33 @@ void get_poly_der(PolyState p, double dt, Point* res, int order)
     res->y = 0;
     res->z = 0;
     
+//    if(p.reverse)
+//        dt = p.duration-dt;
+    
+    if(order == 0){ // Might be unnecessary, but I don't know if the standard code will work well for case order = 0.
+        if(dt > p.duration)
+            dt = p.duration;
+        
+        // Evaluate polynomial at time t
+        res->x=p.coefficients_x[0];
+        res->y=p.coefficients_y[0];
+        res->z=p.coefficients_z[0];
+        
+        double t_pow = dt;
+        for(int k = 1; k < p.order; k++){
+            res->x += t_pow*p.coefficients_x[k];
+            res->y += t_pow*p.coefficients_y[k];
+            res->z += t_pow*p.coefficients_z[k];
+            t_pow *= dt;
+            if(t_pow != t_pow)
+                printf("Error: time overflow");
+        }
+        return;
+    }
+    
     if(dt > p.duration)
         return;
-    if(p.reverse)
-        dt = p.duration-dt;
+
     
     double t = 1;
     for(int k = order; k < p.order; k++){

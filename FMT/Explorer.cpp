@@ -9,8 +9,6 @@
 
 #include "Explorer.h"
 
-
-
 // Constructor, creates a new agent
 Explorer::Explorer(int agentID, int map_x, int map_y){
     self_id = agentID;
@@ -24,6 +22,10 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
         swarm_locs[i].z = 0.0;
     }
 
+    target.x = swarm_locs[self_id].x;
+    target.y = swarm_locs[self_id].y;
+    target.z = swarm_locs[self_id].z;
+    
     frontiers = new int[map_x*map_y];
     num_frontiers = 0;
     cluster_ids = new int[map_x*map_y];
@@ -67,7 +69,7 @@ Explorer::Explorer(int agentID, int map_x, int map_y){
             exploration_map.set(i, j, 0, MAP_UNKN);
     
     // Fast planner used most of the time
-    F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, KNN_CON, 75, &exploration_map);
+    F_sparse = new FMT(map_x, map_y, 0, F_SPARSE_PTS, KNN_CON, 25, &exploration_map);
     f_sparse_calls = 0;
     // Slow(er) planner used when F_sparse fails
     F_dense  = new FMT(map_x, map_y, 0, F_DENSE_PTS, KNN_CON, 75, &exploration_map);
@@ -229,7 +231,6 @@ void Explorer::assign(Point* waypoint){
         printf("Agent %d assigned to (%f,%f)\n", self_id, goal_pt.x,goal_pt.y);
 #endif
         
-        
         // Always replan. TODO: Fix this
         curr_segs = F_sparse->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
         if(current_plan[0].cost == -1){
@@ -269,12 +270,16 @@ void Explorer::assign(Point* waypoint){
             waypoint->z = swarm_locs[self_id].z;
             
         }else{ // this is looking at the next point.
-            // Only valid if reverse = false.
-            waypoint->x =current_plan[1].coefficients_x[0];
-            waypoint->y =current_plan[1].coefficients_y[0];
-            waypoint->z =current_plan[1].coefficients_z[0];
+            if(curr_segs > 1){
+                waypoint->x =current_plan[2].coefficients_x[0];
+                waypoint->y =current_plan[2].coefficients_y[0];
+                waypoint->z =current_plan[2].coefficients_z[0];
+            }else{
+                get_poly_der(current_plan[1], current_plan[1].duration, waypoint, 0);
+            }
         }
         
+        get_poly_der(current_plan[curr_segs], current_plan[curr_segs].duration, waypoint, 0);
         
         // Update velocity.
         // This should be an acceleration controlled system.
@@ -284,7 +289,7 @@ void Explorer::assign(Point* waypoint){
         get_poly_der(current_plan[1], dt, &current_vel, 1);
 
         
-        
+/*
         if(current_vel.x != current_vel.x || current_vel.y != current_vel.y || current_vel.z != current_vel.z)
         {
 //            vel.x = 0.0; vel.y = 0.0; vel.z = 0.0;
@@ -294,6 +299,7 @@ void Explorer::assign(Point* waypoint){
             
             // Compute the value of acceleration/velocity based on ideal physics:
             // v(t+dt) = v(t) + a(t) dt
+            
             
             
             current_acc.x = sign(current_acc.x)*fmin(fabs(current_acc.x), MAX_ACCEL_X* (1296.0/25.0));
@@ -307,9 +313,13 @@ void Explorer::assign(Point* waypoint){
 //            current_vel.z += fmax(current_acc.x, MAX_ACCEL_Z*sign(current_acc.x))*dt;
 
             
-            F_sparse->set_initial_state(&current_vel, &current_acc);
-            F_dense->set_initial_state(&current_vel, &current_acc);
         }
+*/
+        
+        
+#ifdef EXPLORE_DEBUG
+
+        print_call_rates();
         if(self_id >= 0){
             printf("Pos%d = (%f,%f,%f)\n",self_id, swarm_locs[self_id].x,swarm_locs[self_id].y,swarm_locs[self_id].z);
             printf("V%d = %f\n",self_id, norm(current_vel)*5.0/36.0);
@@ -317,13 +327,12 @@ void Explorer::assign(Point* waypoint){
         }
         
         
+
         
         printf("Current plan uses %d paths of %d allocated. Each path has size %ld, meaning %f space is wasted\n", curr_segs, F_DENSE_PTS+2,  sizeof(current_plan[0]), float( sizeof(current_plan[0]))*(F_DENSE_PTS+2-curr_segs));
         
         printf("Size of small FMT planner: %ld. Size of large FMT planner: %ld\n", sizeof(F_sparse), sizeof(&F_dense));
         
-        
-#ifdef EXPLORE_DEBUG
         printf("Agent %d traveling to (%f,%f)\n", self_id, waypoint->x, waypoint->y);
 #endif
     
@@ -341,10 +350,11 @@ void Explorer::assign(Point* waypoint){
 }
 
 
-
+// Updates the map markers
 void Explorer::update_state(Point* positions, int num_agents){
     
     // THIS IS DUMB
+    // Clear the unknown states on the map, reset all goals etc.
     for(int i = 0; i < exploration_map.X_dim; i++){
         for(int j= 0; j < exploration_map.Y_dim; j++){
             char state = exploration_map(i,j,0);
@@ -360,6 +370,7 @@ void Explorer::update_state(Point* positions, int num_agents){
 
     team_size = num_agents;
     int clearing_radius = 3;
+    // Mark other positions, self position, free/occupied/unknown cells
     for(int i = 0; i < team_size; i++){
         exploration_map.set(int(swarm_locs[i].x), int(swarm_locs[i].y), int(swarm_locs[i].z), MAP_TRACE);
         swarm_locs[i].x = positions[i].x;
@@ -457,6 +468,9 @@ bool Explorer::cluster_frontiers(){
         team_size = MAX_TEAMSIZE;
         printf("Error: Team_size exceeded maximum!\n");
     }
+    F_sparse->set_initial_state(&current_vel, &current_acc);
+    F_dense->set_initial_state(&current_vel, &current_acc);
+
     
 // What should happen: Only reset nodes that might have been changed in the map
 // Measurement should have bounds so we don't traverse the whole map
@@ -505,10 +519,6 @@ bool Explorer::cluster_frontiers(){
             }
         }
     }
-
-
-    
-    
     
     // First take a pass through the map and extend any lines of occupied cells
     int min_line = 3;
@@ -587,7 +597,7 @@ bool Explorer::cluster_frontiers(){
     
     
 #ifdef EXPLORE_DEBUG
-    printf("Clustering points. Map has size %d %d\n", exploration_map.X_dim, exploration_map.Y_dim);
+    printf("Clustering points.\n");
 #endif
     int cluster_radius = 3;
     // Step 0: find frontiers/connected components
@@ -691,9 +701,11 @@ bool Explorer::cluster_frontiers(){
     // Time to here: ~0.1 ms
     
 #ifdef EXPLORE_DEBUG
-    printf("Formed %d clusters!", num_clusters);
+    printf("Formed %d clusters at ", num_clusters);
+    for(int i = 0; i < num_clusters; i++)
+        printf(" (%f %f %f) ", clusters[i].median.x, clusters[i].median.y, clusters[i].median.z);
+    printf("\n");
 #endif
-    
     
     // If we have more clusters than agents, try to condense them
     int merge_partners[num_clusters];
@@ -806,6 +818,14 @@ bool Explorer::cluster_frontiers(){
         }
     }
     
+#ifdef EXPLORE_DEBUG
+    printf("Post-processed cluster locations: ", num_active_clusters);
+    for(int i = 0; i < num_active_clusters; i++)
+        printf(" (%f %f %f) ", clusters[active_clusters[i]].median.x, clusters[active_clusters[i]].median.y, clusters[active_clusters[i]].median.z);
+    printf("\n");
+
+#endif
+    
     // Exploration not done yet
     return false;
 }
@@ -829,14 +849,16 @@ void Explorer::compute_cost(Point start, Cluster* goal, PolyState* path, int goa
 }
  */
 
-void Explorer::compute_cost(Point start, Point goal, PolyState* path, int goal_num){
+void Explorer::compute_cost(Point start, Point goal, Point goal_vel, PolyState* path, int goal_num){
 
-    path_segs[goal_num] = F_sparse->fmtstar(start, goal, &exploration_map, path);
+    // Check for line of sight - we don't actually use these paths for anything.
+    
+    path_segs[goal_num] = F_sparse->fmtstar(start, goal, goal_vel, &exploration_map, path);
     
 
     f_sparse_calls++;
     if(path[0].cost == -1){
-        path_segs[goal_num] = F_dense->fmtstar(start, goal, &exploration_map, path);
+        path_segs[goal_num] = F_dense->fmtstar(start, goal, goal_vel,  &exploration_map, path);
         f_dense_calls++;
     }
     if(path[0].cost == -1){
@@ -845,6 +867,9 @@ void Explorer::compute_cost(Point start, Point goal, PolyState* path, int goal_n
 #endif
         goal_costs[self_id][goal_num] = 1000000;
     }else{
+#ifdef EXPLORE_DEBUG
+        printf("Cost to goal (%f,%f) is %f\n", goal.x, goal.y, path[0].cost);
+#endif
         goal_costs[self_id][goal_num] = path[0].cost;
     }
 }
@@ -864,26 +889,40 @@ int Explorer::compute_costs(){
     
 
     for(int i = 0; i < num_active_clusters; i++){
-        
         goal_locations[i].x = clusters[active_clusters[i]].median.x;
         goal_locations[i].y = clusters[active_clusters[i]].median.y;
         goal_locations[i].z = clusters[active_clusters[i]].median.z;
         num_goals+=1;
-        compute_cost(swarm_locs[self_id], clusters[active_clusters[i]].median, tmp_path, i);
+        float min_dist = 0;
+        Point min_dir;
+        Point loc;
+        for(int c = 0; c < clusters[active_clusters[i]].size; c++){
+            exploration_map.num2ind(&loc, clusters[active_clusters[i]].members[i]);
+            if(dist(loc, goal_locations[i]) < min_dist){
+                min_dir.x = loc.x - goal_locations[i].x;
+                min_dir.y = loc.y - goal_locations[i].y;
+                min_dir.z = loc.z - goal_locations[i].z;
+            }
+        }
+
+        if(!exploration_map.is_free(goal_locations[i])){
+            min_dir.x = -min_dir.x;
+            min_dir.y = -min_dir.y;
+            min_dir.z = - min_dir.z;
+        }
+        
+        compute_cost(swarm_locs[self_id], clusters[active_clusters[i]].median, min_dir, tmp_path, i);
     }
     
     // Discount the goal you already chose
-    Point goal_pt;
+    /*
     int goal_ind = -1;
     if(current_plan[0].cost != -1){
-        goal_pt.x = current_plan[curr_segs-1].coefficients_x[0];
-        goal_pt.y = current_plan[curr_segs-1].coefficients_x[0];
-        goal_pt.z = current_plan[curr_segs-1].coefficients_x[0];
         
         // Don't discount staying still.
             float mindist = MAXFLOAT;
             for(int i =0; i < num_goals; i++){
-                float d= dist(goal_locations[i],goal_pt);
+                float d= dist(goal_locations[i],target);
                 if(d > merge_dist && d < mindist){
                     mindist = d;
                     goal_ind = i;
@@ -891,15 +930,16 @@ int Explorer::compute_costs(){
             }
             
         if(goal_ind != -1){
-            if(dist(goal_pt, swarm_locs[self_id]) > 1.0){
-                goal_costs[self_id][goal_ind] -= 20;
+            if(dist(target, swarm_locs[self_id]) > 1.0){
+                goal_costs[self_id][goal_ind] -= 2000;
             }else{
                 // Discourage staying still
-                goal_costs[self_id][goal_ind] += 20;
+                goal_costs[self_id][goal_ind] += 2000;
             }
-            
         }
     }
+     */
+    
 
     return num_active_clusters;
 }

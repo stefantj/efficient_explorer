@@ -11,7 +11,7 @@
 
 // Temporary function for printing the neighborhood of an agent:
 void FMT::plot_neighborhood(int i){
-    Neighborhood* n = &(neighborhoods[i]);
+    Neighborhood* n = &(neighborhoodsF[i]);
     Point* pt = points[i].state;
     printf("# Begin neighborhood plot\n");
     printf("scatter3D(%f,%f,%f,marker=\"o\",color=:green);\n", pt[0].x,pt[0].y,pt[0].z); // Mark current location
@@ -93,7 +93,7 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
     if(connection_type == RAD_CON){
         max_neighborhood_size = int(num_pts/5);
     }else if(connection_type == KNN_CON){
-        max_neighborhood_size = int(connection_param+10);
+        max_neighborhood_size = int(connection_param*1.5);
     }
     
     smoother = new PolynomialSmoother();
@@ -103,7 +103,7 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
     sample_points();
     
     // Compute neighborhoods (return if error)
-    if(!compute_neighborhoods(map_structure))
+    if(!initialize_neighborhoods(map_structure))
         return;
 #ifdef FMT_DEBUG
     print_parameters();
@@ -111,30 +111,32 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
 //    for(int i = 0; i < parameters.num_pts; i++)
 //        plot_neighborhood(i);
 
-#endif
-    
     
     int max_num_cells = 0;
     float mean_cells = 0;
     float cells_count = 0;
     for(int i = 0; i < parameters.num_pts+2; i++){
-        for(int j = 0; j < neighborhoods[i].size; j++){
-            if(neighborhoods[i].paths[j].num_cells > max_num_cells)
-                max_num_cells = neighborhoods[i].paths[j].num_cells;
-            mean_cells = mean_cells*(cells_count/(cells_count+1)) + (float)neighborhoods[i].paths[j].num_cells/(cells_count+1);
+        for(int j = 0; j < neighborhoodsF[i].size; j++){
+            if(neighborhoodsF[i].paths[j].num_cells > max_num_cells)
+                max_num_cells = neighborhoodsF[i].paths[j].num_cells;
+            mean_cells = mean_cells*(cells_count/(cells_count+1)) + (float)neighborhoodsF[i].paths[j].num_cells/(cells_count+1);
+            cells_count+=1;
+        }
+        for(int j = 0; j < neighborhoodsR[i].size; j++){
+            if(neighborhoodsR[i].paths[j].num_cells > max_num_cells)
+                max_num_cells = neighborhoodsR[i].paths[j].num_cells;
+            mean_cells = mean_cells*(cells_count/(cells_count+1)) + (float)neighborhoodsR[i].paths[j].num_cells/(cells_count+1);
             cells_count+=1;
         }
     }
-    
-#ifdef FMT_DEBUG
-    printf(" Maximum number of cells used: %d. Maximum allocated: %d\n", max_num_cells, MAX_POLY_CELLS);
+     printf(" Maximum number of cells used: %d. Maximum allocated: %d\n", max_num_cells, MAX_POLY_CELLS);
     printf(" Average number of cells used: %f. Wasted allocation: %f\n", mean_cells, (MAX_POLY_CELLS-mean_cells)*cells_count);
 #endif
     
     
     
     // Initialize planning containers: // all of these could be made smaller for memory savings
-    Windex = new int[parameters.num_pts+1];
+    Windex = new int[parameters.num_pts+2];
     Parents = new int[parameters.num_pts+2];
     Costs = new float[parameters.num_pts+2];
     Active = new int[parameters.num_pts+2];
@@ -144,7 +146,6 @@ FMT::FMT(int xlimit, int ylimit, int zlimit, int num_pts, int connection_type, f
     x_near.indices = new int[parameters.num_pts+2];
     y_near.costs = new float[parameters.num_pts+2];
     y_near.indices = new int[parameters.num_pts+2];
-    
     
     init_vel.x = 0.0;
     init_vel.y = 0.0;
@@ -168,14 +169,22 @@ FMT::~FMT(){
     if(is_initialized){
         // Erase neighborhoods:
         for(int i = 0; i < parameters.num_pts+2; i++){
-            delete [] neighborhoods[i].indices;
-            delete [] neighborhoods[i].costs;
-            delete [] neighborhoods[i].cache;
-            for(int j = 0; j < neighborhoods[i].size; j++)
-                delete [] neighborhoods[i].paths[j].cells;
-            delete [] neighborhoods[i].paths;
+            delete [] neighborhoodsF[i].indices;
+            delete [] neighborhoodsF[i].costs;
+            delete [] neighborhoodsF[i].cache;
+            for(int j = 0; j < neighborhoodsF[i].size; j++)
+                delete [] neighborhoodsF[i].paths[j].cells;
+            delete [] neighborhoodsF[i].paths;
+            
+            delete [] neighborhoodsR[i].indices;
+            delete [] neighborhoodsR[i].costs;
+            delete [] neighborhoodsR[i].cache;
+            for(int j = 0; j < neighborhoodsR[i].size; j++)
+                delete [] neighborhoodsR[i].paths[j].cells;
+            delete [] neighborhoodsR[i].paths;
         }
-        delete [] neighborhoods;
+        delete [] neighborhoodsF;
+        delete [] neighborhoodsR;
         
         // Erase planning containers
         delete [] Windex;
@@ -216,71 +225,166 @@ bool operator<(const Heap_pt& lhs, const Heap_pt& rhs){
 }
 
 int FMT::fmtstar(Point start, Point goal, Map* map, PolyState* path){
-    
-    //push start, goal onto points list
-    points[start_pt_ind].state[0].x = start.x;
-    points[start_pt_ind].state[0].y = start.y;
-    points[start_pt_ind].state[0].z = start.z;
-    
-    points[goal_pt_ind].state[0].x  = goal.x;
-    points[goal_pt_ind].state[0].y  = goal.y;
-    points[goal_pt_ind].state[0].z  = goal.z;
-
+#ifdef FMT_DEBUG
+    printf("\n\n");
+#endif
     // Error check (this is incomplete)
     if(isnan(start.x) || isnan(start.y) || isnan(start.z) || isnan(goal.x) || isnan(goal.y) || isnan(goal.z)){
         path[0].cost = -1;
         return 0;
     }
-
+    
+    
+    //push start, goal onto points list
+    points[start_pt_ind].state[0].x = start.x;
+    points[start_pt_ind].state[0].y = start.y;
+    points[start_pt_ind].state[0].z = start.z;
+    points[start_pt_ind].state[1].x = init_vel.x;
+    points[start_pt_ind].state[1].y = init_vel.y;
+    points[start_pt_ind].state[1].z = init_vel.z;
+    points[start_pt_ind].state[2].x = init_acc.x;
+    points[start_pt_ind].state[2].y = init_acc.y;
+    points[start_pt_ind].state[2].z = init_acc.z;
+    
+    
+    points[goal_pt_ind].state[0].x  = goal.x;
+    points[goal_pt_ind].state[0].y  = goal.y;
+    points[goal_pt_ind].state[0].z  = goal.z;
+    points[start_pt_ind].state[1].x = 0;
+    points[start_pt_ind].state[1].y = 0;
+    points[start_pt_ind].state[1].z = 0;
+    points[start_pt_ind].state[2].x = 0;
+    points[start_pt_ind].state[2].y = 0;
+    points[start_pt_ind].state[2].z = 0;
+    
+    reset_neighborhood(start_pt_ind);
+    reset_neighborhood(goal_pt_ind);
+    
     // Start by constructing neighborhoods for start/finish points
-    if(! compute_neighborhood(goal, goal_pt_ind, map) || !compute_neighborhood(start, start_pt_ind, map) ){
+    if(! compute_neighborhood(goal_pt_ind, map) || !compute_neighborhood(start_pt_ind, map) ){
         path[0].cost = -1;
         return 0;
     }
     
-    
-#ifdef FMT_DEBUG
-    printf("Start index has %d neighbors, end index has %d. \n", neighborhoods[start_pt_ind].size, neighborhoods[goal_pt_ind].size);
-    
-    int n_have_start = 0;
-    int n_have_end = 0;
-    for(int i = 0; i < parameters.num_pts; i++){
-        if(find_element(neighborhoods[i].indices, neighborhoods[i].size, start_pt_ind) != -1)
-            n_have_start++;
-        
-        if(find_element(neighborhoods[i].indices, neighborhoods[i].size, goal_pt_ind) != -1)
-            n_have_end++;
-    }
-    
-    printf("%d other points have the start point as a neighbor, %d have the end point. \n", n_have_start, n_have_end);
-    
-    bool feasible = false;
-    for(int i = 0; i < neighborhoods[start_pt_ind].size; i++){
-        if(!collision_inds(start_pt_ind, neighborhoods[start_pt_ind].indices[i], map))
-            feasible = true;
-    }
-    if(!feasible){
-        printf("No connections to starting point. ");
-    }
-    feasible = false;
-    for(int i = 0; i < neighborhoods[goal_pt_ind].size; i++){
-        if(!collision_inds(goal_pt_ind, neighborhoods[goal_pt_ind].indices[i], map))
-            feasible = true;
-    }
-    if(!feasible){
-        printf("No connections to end point.\n");
-    }
-    
-#endif
-    
     return plan_path(map, path);
 }
 
-// Plans the path. Need to change the path representation.
+
+int FMT::fmtstar(Point start, Point goal, Point goal_vel, Map* map, PolyState* path){
+#ifdef FMT_DEBUG
+    printf("\n\n");
+#endif
+    // Error check (this is incomplete)
+    if(isnan(start.x) || isnan(start.y) || isnan(start.z) || isnan(goal.x) || isnan(goal.y) || isnan(goal.z)){
+        path[0].cost = -1;
+        return 0;
+    }
+    
+
+    //push start, goal onto points list
+    points[start_pt_ind].state[0].x = start.x;
+    points[start_pt_ind].state[0].y = start.y;
+    points[start_pt_ind].state[0].z = start.z;
+    points[start_pt_ind].state[1].x = init_vel.x;
+    points[start_pt_ind].state[1].y = init_vel.y;
+    points[start_pt_ind].state[1].z = init_vel.z;
+    points[start_pt_ind].state[2].x = init_acc.x;
+    points[start_pt_ind].state[2].y = init_acc.y;
+    points[start_pt_ind].state[2].z = init_acc.z;
+    
+    
+    points[goal_pt_ind].state[0].x  = goal.x;
+    points[goal_pt_ind].state[0].y  = goal.y;
+    points[goal_pt_ind].state[0].z  = 0*goal.z;
+    points[start_pt_ind].state[1].x = goal_vel.x;
+    points[start_pt_ind].state[1].y = goal_vel.y;
+    points[start_pt_ind].state[1].z = 0*goal_vel.z;
+    points[start_pt_ind].state[2].x = 0;
+    points[start_pt_ind].state[2].y = 0;
+    points[start_pt_ind].state[2].z = 0;
+    
+    reset_neighborhood(start_pt_ind);
+    reset_neighborhood(goal_pt_ind);
+
+    // Start by constructing neighborhoods for start/finish points
+    if(! compute_neighborhood(goal_pt_ind, map) || !compute_neighborhood(start_pt_ind, map) ){
+        path[0].cost = -1;
+        return 0;
+    }
+    
+    /*
+    FILE* f=fopen("adjmat.jl", "w");
+    
+    fprintf(f, "AdjF = [");
+    for(int i = 0; i < parameters.num_pts+2; i++){
+        int neighb_ind = 0;
+        for(int j = 0; j < parameters.num_pts+2; j++){
+            if(neighb_ind < neighborhoodsF[i].size && neighborhoodsF[i].indices[neighb_ind] == j){
+                    fprintf(f," 1");
+                    neighb_ind+=1;
+            }else{
+                fprintf(f," 0");
+            }
+        }
+        if(i != parameters.num_pts+1)
+            fprintf(f,";");
+    }
+    fprintf(f,"];\n");
+    fprintf(f,"AdjR = [");
+    for(int i = 0; i < parameters.num_pts+2; i++){
+        int neighb_ind = 0;
+        for(int j = 0; j < parameters.num_pts+2; j++){
+            if(neighb_ind < neighborhoodsR[i].size && neighborhoodsR[i].indices[neighb_ind] == j){
+                fprintf(f," 1");
+                neighb_ind+=1;
+            }else{
+                fprintf(f," 0");
+            }
+        }
+        if(i != parameters.num_pts+1)
+            fprintf(f,";");
+    }
+    fprintf(f,"];\n");
+    
+    fprintf(f,"nF = [");
+    for(int i = 0; i < parameters.num_pts+2; i++){
+        for(int j = 0; j < max_neighborhood_size; j++){
+            if(j < neighborhoodsF[i].size){
+                fprintf(f," %d", neighborhoodsF[i].indices[j]);
+            }else{
+                fprintf(f," 0");
+            }
+        }
+        if(i != parameters.num_pts+1)
+            fprintf(f, ";");
+    }
+    fprintf(f, "];\n");
+
+    fprintf(f,"nR = [");
+    for(int i = 0; i < parameters.num_pts+2; i++){
+        for(int j = 0; j < max_neighborhood_size; j++){
+            if(j < neighborhoodsR[i].size){
+                fprintf(f," %d", neighborhoodsR[i].indices[j]);
+            }else{
+                fprintf(f," 0");
+            }
+        }
+        if(i != parameters.num_pts+1)
+            fprintf(f, ";");
+    }
+    fprintf(f, "];\n");
+
+    throw 1;
+    
+     */
+    return plan_path(map, path);
+}
+
+// Plans the path.
 int FMT::plan_path(Map* map, PolyState* path){
     
     // Initialize containers for search
-    int Windex_size = parameters.num_pts+2; // includes end point but not start point.
+    int Windex_size = parameters.num_pts+2;
     for(int i = 0; i < Windex_size; i++)
         Windex[i] = i;
     
@@ -318,50 +422,65 @@ int FMT::plan_path(Map* map, PolyState* path){
         H_new_size = 0;
         
         //Construct neighborhood of z
-        filter(&x_near, z, Windex, Windex_size, -1);
+        filterF(&x_near, z, Windex, Windex_size, -1);
         
+        /*
 #ifdef FMT_DEBUG
         int cnt = 0;
         bool sorted = true;
-        for(int i = 0; i < neighborhoods[z].size; i++){
-            if(find_element(Windex, Windex_size, neighborhoods[z].indices[i]) >= 0)
+        for(int i = 0; i < neighborhoodsF[z].size; i++){
+            if(find_element(Windex, Windex_size, neighborhoodsF[z].indices[i]) >= 0)
                 cnt++;
             for(int j = 0; j < i; j++){
-                if(neighborhoods[z].indices[i] <= neighborhoods[z].indices[j])
+                if(neighborhoodsF[z].indices[i] <= neighborhoodsF[z].indices[j])
                     sorted = false;
             }
         }
+        bool Wsorted = true;
+        for(int i = 0; i < Windex_size; i++){
+            for(int j = 0; j < i; j++){
+                if(Windex[i] <= Windex[j])
+                    Wsorted = false;
+            }
+        }
         
-        printf("X_near (%d) has %d points. Should have %d points. Sorted? %d\n", z, x_near.size, cnt, sorted);
-        printf("Windex has %d points\n", Windex_size);
-        printf("Z_neighborhood has %d points\n", neighborhoods[z].size);
+        printf("X_nearF (%d) has %d points. Should have %d points. Sorted? %d\n", z, x_near.size, cnt, sorted);
+        if(!sorted){
+            for(int i =0; i < neighborhoodsF[z].size; i++){
+                printf("%d ", neighborhoodsF[z].indices[i]);
+            }
+            printf("\n");
+        }
+        printf("Windex has %d points. Sorted? %d\n", Windex_size,Wsorted);
+        printf("Active has %d points\n", Active_size);
 #endif
+         */
 
         int ind_x = 0;
         for(int i_x = 0; i_x < x_near.size; i_x++){
             ind_x = x_near.indices[i_x];
+            filterR(&y_near, ind_x, Active, Active_size, ind_x);
             
-            
-            /*
-            // I don't think this transfers quite right to the KNN setting. Problem is this searches for connections _from_ x points _to_ active, when we want the vice-versa connections.
-            filter(&y_near, ind_x, Active, Active_size, ind_x);
-            
+#ifdef FMT_DEBUG
+//            printf("Y_nearR (%d) has %d points.\n", ind_x, y_near.size);
+#endif
+            int min_parent = -1;
+            float cmin = MAXFLOAT;
             if(y_near.size > 0){
                 // Find minimum parent:
-                float cmin = MAXFLOAT;
-                int y_min = -1;
                 for(int i_y = 0; i_y < y_near.size; i_y++){
                     if(ind_x == y_near.indices[i_y]) // Don't connect to self!
                         continue;
                     
-                    // TODO: Update
                     float c = Costs[y_near.indices[i_y]]+y_near.costs[i_y];
                     if(c < cmin){
                         cmin  = c;
-                        y_min = i_y;
+                        min_parent = y_near.indices[i_y];
                     }
                 }
-             */
+            }
+            
+/*
             int min_parent = -1;
             float c_min = MAXFLOAT;
             // Search each element in Active to see whether ind_x is in it. This is _much_ slower!! Re-implement a backwards neighborhood if this fixes things.
@@ -369,29 +488,27 @@ int FMT::plan_path(Map* map, PolyState* path){
                 if(Active[a] == ind_x)
                     continue;
                 
-                int active_ind = find_element(neighborhoods[Active[a]].indices, neighborhoods[Active[a]].size, ind_x);
+                int active_ind = find_element(neighborhoodsF[Active[a]].indices, neighborhoodsF[Active[a]].size, ind_x);
                 if(active_ind != -1){
-                    float c = Costs[Active[a]] + neighborhoods[Active[a]].costs[active_ind];
+                    float c = Costs[Active[a]] + neighborhoodsF[Active[a]].costs[active_ind];
                     if(c < c_min){
                         c_min = c;
                         min_parent = Active[a];
                     }
                 }
             }
-        
+*/
             if(min_parent != -1){
+                if(min_parent != -1 && !collision_inds(ind_x,min_parent, map)){
 #ifdef FMT_DEBUG
-                printf("Found parent for point %d -> %d\n", ind_x, min_parent);
-#endif
-                if(min_parent != -1 && !collision_inds(ind_x, min_parent, map)){
-#ifdef FMT_DEBUG
+                    // Make sure the cache is updated appropriately:
 
 #endif
                     // Add parent
                     Parents[ind_x] = min_parent;
                     
                     // Update cost to go
-                    Costs[ind_x] = c_min;
+                    Costs[ind_x] = cmin;
                     
                     // Mark as visited
                     H_new[H_new_size] = ind_x;
@@ -401,15 +518,13 @@ int FMT::plan_path(Map* map, PolyState* path){
                     // Add to heap
                     Heap_pt new_pt;
                     new_pt.index = ind_x;
-                    new_pt.cost  = c_min;
+                    new_pt.cost  = cmin;
                     HHeap.push(new_pt);
-                } else{
-#ifdef FMT_DEBUG
-                    printf("collision? %d. Otherwise y_near is empty.\n", collision_inds(ind_x, min_parent, map));
-#endif
                 }
             }else{
-                printf("y_near is empty (no connection to %d active points)\n", Active_size);
+#ifdef FMT_DEBUG
+//                printf("y_near is empty (no connection to %d active points)\n", Active_size);
+#endif
             }
         }
 
@@ -418,17 +533,7 @@ int FMT::plan_path(Map* map, PolyState* path){
 
         // Remove z
         Active_size = remove_element(Active,Active_size, z);
-#ifdef FMT_DEBUG
-        printf("Active size: %d\n", Active_size);
-        for(int a = 0; a < Active_size; a++){
-            int goal_connection = find_element(neighborhoods[Active[a]].indices, neighborhoods[Active[a]].size, goal_pt_ind);
-            if(goal_connection >= 0){
-                printf("Goal is reachable by an element of Active (%d)\n", Active[a]);
-                break;
-            }
-        }
-#endif
-
+        
         if(HHeap.size() > 0){
             z = HHeap.top().index;
             HHeap.pop();
@@ -450,6 +555,8 @@ int FMT::plan_path(Map* map, PolyState* path){
     int curr_ind = 0;
     int start_ind = 0;
     path[0].cost = 0;
+    
+    /*
     // Connect to goal if LOS was used
     if(z!= goal_pt_ind){
         curr_ind = goal_pt_ind;
@@ -460,11 +567,21 @@ int FMT::plan_path(Map* map, PolyState* path){
 #endif
         path_length = 1;
     }
+     */
+
+#ifdef FMT_DEBUG
+    Point tmp;
+    printf("Goal point location (preassembly): (%f,%f)\n", points[z].state[0].x,points[z].state[0].y);
+    get_poly_der(*(get_neighborhood_poly(Parents[z], z)), (get_neighborhood_poly(Parents[z], z))->duration, &tmp, 0);
+    printf("Final point of polynomial (preassembly): (%f,%f)\n", tmp.x,tmp.y);
+#endif
     
-// Doesn't seem right... DEFINITE bugs here.
     curr_ind = z;
     // Insert points backwards from the back
-    while(Parents[curr_ind] >= 0){
+    while(Parents[curr_ind] >= 0){ // Will be false when we reach the start point.
+#ifdef FMT_DEBUG
+        printf("%d (%f,%f) <- ", curr_ind, points[curr_ind].state[0].x,points[curr_ind].state[0].y);
+#endif
         // Error checking:
         if(path_length >= parameters.num_pts+2) // Error in path - too many elements
         {path_length = -1; break;}
@@ -474,8 +591,72 @@ int FMT::plan_path(Map* map, PolyState* path){
         //Insert appropriate polynomial in appropriate place of path:
         start_ind = Parents[curr_ind];
         copy_polystate(&(path[(parameters.num_pts+1)- path_length]), get_neighborhood_poly(start_ind, curr_ind));
+        
+        
 #ifdef FMT_DEBUG
-        printf("Placed polynomial at %d\n", parameters.num_pts+1-path_length);
+        for(int c = 0; c < path[(parameters.num_pts+1)-path_length].num_cells; c++){
+            if(!map->is_free(path[(parameters.num_pts+1)-path_length].cells[c])){
+                printf("\n**********************************************************************************************\n");
+                printf("Error: Collision on path being returned. Occurs while traveling between %d: (%f,%f) and %d: (%f,%f). Cache reads:", start_ind, points[start_ind].state[0].x,points[start_ind].state[0].y, curr_ind, points[curr_ind].state[0].x,points[curr_ind].state[0].y);
+                   // See whether in start_ind's FORWARD neighborhood:
+                int ind = find_element(neighborhoodsF[start_ind].indices, neighborhoodsF[start_ind].size, curr_ind);
+                if(ind != -1){
+                        switch (neighborhoodsF[start_ind].cache[ind]) {
+                            case CACHE_FREE:
+                                printf("CACHE_FREE\n");
+                                break;
+                            case CACHE_FREE_U:
+                                printf("CACHE_FREE_U\n");
+                                break;
+                            case CACHE_OCC:
+                                printf("CACHE_OCC\n");
+                                break;
+                            case CACHE_OCC_U:
+                                printf("CACHE_OCC_U\n");
+                                break;
+                            case CACHE_UNK:
+                                printf("CACHE_UNK\n");
+                                break;
+                            default:
+                                printf("INVALID: %d\n", (neighborhoodsF[start_ind].cache[ind]));
+                                break;
+                        }
+                    neighborhoodsF[start_ind].cache[ind] = CACHE_OCC;
+                        printf("Item found in forward cache of start point\n");
+                    }else{
+                   // See whether in end_ind's reverse neighborhood:
+                   ind = find_element(neighborhoodsR[curr_ind].indices, neighborhoodsR[curr_ind].size, start_ind);
+                       if(ind != -1){
+                           switch (neighborhoodsR[curr_ind].cache[ind]) {
+                               case CACHE_FREE:
+                                   printf("CACHE_FREE\n");
+                                   break;
+                               case CACHE_FREE_U:
+                                   printf("CACHE_FREE_U\n");
+                                   break;
+                               case CACHE_OCC:
+                                   printf("CACHE_OCC\n");
+                                   break;
+                               case CACHE_OCC_U:
+                                   printf("CACHE_OCC_U\n");
+                                   break;
+                               case CACHE_UNK:
+                                   printf("CACHE_UNK\n");
+                                   break;
+                               default:
+                                   printf("INVALID: %d\n", (neighborhoodsR[curr_ind].cache[ind]));
+                                   break;
+                           }
+                           printf("Item found in reverse cache of end point\n");
+                           neighborhoodsR[curr_ind].cache[ind] = CACHE_OCC;
+                        }
+                }
+                
+                printf("**********************************************************************************************\n");
+                path[0].cost = -1;
+                return 0;
+        }
+        }
 #endif
         // Update costs
         if(path[(parameters.num_pts+1)-path_length].cost == -1){
@@ -487,7 +668,11 @@ int FMT::plan_path(Map* map, PolyState* path){
         path_length++;
     }
 
+    
     if(path_length >= 0){
+        // Shift to front - no need to flip.
+        int shift_ind = parameters.num_pts+2 - path_length;
+        int offset = 1;
         if(start_ind != start_pt_ind){
             copy_polystate(&(path[1]), get_neighborhood_poly(start_ind, curr_ind));
             // Update costs
@@ -497,16 +682,11 @@ int FMT::plan_path(Map* map, PolyState* path){
                 path[0].cost += path[(parameters.num_pts+1)-path_length].cost;
             }
             path_length++;
+            offset += 1;
         }
 
-        // Shift to front
-        int shift_ind = parameters.num_pts+1;
         for(int i = 0; i < path_length; i++){
-#ifdef FMT_DEBUG
-            printf("Shifting from %d to %d\n", shift_ind - i, i+1);
-#endif
-            copy_polystate(&(path[i+1]), &(path[shift_ind-i]));
-            path[i+1] = path[shift_ind - i];
+            copy_polystate(&(path[i+offset]), &(path[shift_ind+i]));
         }
         
     }else{
@@ -516,60 +696,68 @@ int FMT::plan_path(Map* map, PolyState* path){
     }
 
 #ifdef FMT_DEBUG
-    printf("Polynomial has %d segments with coefficients :\n",path_length);
-    for(int i = 0; i <=parameters.num_pts+1; i++){
-        if(path[i].order != 0){
-            printf("Seg %d: order %d (rev= %d)\n", i, path[i].order, path[i].reverse);
-            printf("x = [ ");
-            for(int k = 0; k < path[i].order; k++)
-                printf(" %f ", path[i].coefficients_x[k]);
-            printf("]\ny = [ ");
-            for(int k = 0; k < path[i].order; k++)
-                printf(" %f ", path[i].coefficients_y[k]);
-            printf("]\n");
-            printf("cells: ");
-            for(int k = 0; k < path[i].num_cells; k++)
-                printf("%d, ", path[i].cells[k]);
-            printf("\n");
-        }
-    }
-    
     printf("Path length: %d, path cost: %f\n", path_length, path[0].cost);
+    get_poly_der(path[parameters.num_pts+1], path[parameters.num_pts+1].duration, &tmp, 0);
+    printf("Final point of polynomial: (%f,%f)\n", tmp.x,tmp.y);
+    get_poly_der(path[path_length], path[path_length].duration, &tmp, 0);
+    printf("Final point of flipped polynomial: (%f,%f)\n", tmp.x,tmp.y);
+    printf("Goal point location: (%f,%f)\n", points[goal_pt_ind].state[0].x,points[goal_pt_ind].state[0].y);
 #endif
     
     // Clean up planner containers
     reset_neighborhood(start_pt_ind);
     reset_neighborhood(goal_pt_ind);
+    
+#ifdef FMT_WARNING
+    // Double check that the path is free:
+    for(int seg = 1; seg < path_length; seg++){
+        for(int c=0; c < path[seg].num_cells; c++){
+            if(!map->is_free(path[seg].cells[c])){
+                printf("**********************************************************************************************\n");
+                printf("Error: Collision on path being returned. Occurs on segment %d, while planning to (%f,%f,%f)\n", seg,points[goal_pt_ind].state[0].x,points[goal_pt_ind].state[0].y,points[goal_pt_ind].state[0].z);
+                printf("**********************************************************************************************\n");
+                path[0].cost = -1;
+                return 0;
+            }
+        }
+    }
+#endif
 
     return path_length;
 }
 
+// Seems like a waste. Should use methods for search.
 PolyState* FMT::get_neighborhood_poly(int start_ind, int end_ind){
-    // See whether in start_ind's neighborhood:
-    for( int i_s=0; i_s < neighborhoods[start_ind].size; i_s++){
-        if(neighborhoods[start_ind].indices[i_s] == end_ind){
-            return &(neighborhoods[start_ind].paths[i_s]);
-        }
-    }
+
+    // See whether in start_ind's FORWARD neighborhood:
+    int ind = find_element(neighborhoodsF[start_ind].indices, neighborhoodsF[start_ind].size, end_ind);
+    if(ind != -1)
+        return &(neighborhoodsF[start_ind].paths[ind]);
+    
+    // See whether in end_ind's reverse neighborhood:
+    ind = find_element(neighborhoodsR[end_ind].indices, neighborhoodsR[end_ind].size, start_ind);
+    if(ind != -1)
+        return &(neighborhoodsR[end_ind].paths[ind]);
+    
     // Otherwise return bad polynomial
     return NULL;
 }
 
 
-// Returns the neighborhood of index filtered by filter
+// Returns the forward neighborhood of index filtered by filter
 // Since the filter is sorted, can speed up
 // Maintains same sorting as original neighborhood
 // Assumes that neighborhoods[index].indices and filter_vec are sorted, smallest first.
-void FMT::filter(Neighborhood* filtered_neighborhood, int index, int* filter_vec, int filter_size, int exclude){
+void FMT::filterF(Neighborhood* filtered_neighborhood, int index, int* filter_vec, int filter_size, int exclude){
     int i_n = 0; int i_f = 0; int ind_n = 0;
     filtered_neighborhood->size = 0;
     float c = 0;
     
-    while(i_n < neighborhoods[index].size && i_f < filter_size){
-        ind_n = neighborhoods[index].indices[i_n];
+    while(i_n < neighborhoodsF[index].size && i_f < filter_size){
+        ind_n = neighborhoodsF[index].indices[i_n];
         if(ind_n == filter_vec[i_f]){
             if(ind_n != exclude){
-                c = neighborhoods[index].costs[i_n];
+                c = neighborhoodsF[index].costs[i_n];
                 filtered_neighborhood->indices[filtered_neighborhood->size] = ind_n;
                 filtered_neighborhood->costs[filtered_neighborhood->size]   = c;
                 filtered_neighborhood->size+=1;
@@ -583,6 +771,32 @@ void FMT::filter(Neighborhood* filtered_neighborhood, int index, int* filter_vec
     }
 }
 
+// Returns the reverse neighborhood of index filtered by filter
+// Since the filter is sorted, can speed up
+// Maintains same sorting as original neighborhood
+// Assumes that neighborhoods[index].indices and filter_vec are sorted, smallest first.
+void FMT::filterR(Neighborhood* filtered_neighborhood, int index, int* filter_vec, int filter_size, int exclude){
+    int i_n = 0; int i_f = 0; int ind_n = 0;
+    filtered_neighborhood->size = 0;
+    float c = 0;
+    
+    while(i_n < neighborhoodsR[index].size && i_f < filter_size){
+        ind_n = neighborhoodsR[index].indices[i_n];
+        if(ind_n == filter_vec[i_f]){
+            if(ind_n != exclude){
+                c = neighborhoodsR[index].costs[i_n];
+                filtered_neighborhood->indices[filtered_neighborhood->size] = ind_n;
+                filtered_neighborhood->costs[filtered_neighborhood->size]   = c;
+                filtered_neighborhood->size+=1;
+            }
+            i_n+=1; i_f += 1;
+        }else if( ind_n < filter_vec[i_f]){
+            i_n += 1;
+        }else{
+            i_f += 1;
+        }
+    }
+}
 
 /*** Private methods ***/
 
@@ -641,6 +855,7 @@ void FMT::sample_points(){
 
 
 // Resets neighborhoods. Meant for use only by start_ind and goal_ind
+// Could be made more efficient if we cared to, but this is an infinitesmal piece of the runtime.
 bool FMT::reset_neighborhood(int index){
 #ifdef FMT_DEBUG
 //    printf("reset_neighborhood\n");
@@ -651,60 +866,61 @@ bool FMT::reset_neighborhood(int index){
         return false;
     }
     
-    if(parameters.connection_type == RAD_CON){
+    if(parameters.connection_type == RAD_CON || parameters.connection_type == KNN_CON){
         // clear cache
         // Remove from neighborhood of every neighbor. Because these are added at the end, only need to check last two:
-        for(int i_n = 0; i_n < neighborhoods[index].size; i_n++){
-            //            neighborhoods[index].cache[i_n] = CACHE_UNK;
+        for(int n = 0; n < parameters.num_pts; n++){
             // check neighbor's end points for target:
-            int n = neighborhoods[index].indices[i_n];
-            int n_size = neighborhoods[n].size;
+            int n_size = neighborhoodsF[n].size;
             
             // Check last item
-            if(n_size >= 1 && neighborhoods[n].indices[n_size-1] == index){
-                // Delete the path:
-                //                neighborhoods[n].paths[neighborhoods[n].size].num_cells = 0;
+            if(n_size >= 1 && neighborhoodsF[n].indices[n_size-1] == index){
                 //Remove end elements by forgetting they exist:
-                neighborhoods[n].size -=1;
-            }else if(n_size >= 2 && neighborhoods[n].indices[n_size-2] == index){
+                neighborhoodsF[n].size -=1;
+            }else if(n_size >= 2 && neighborhoodsF[n].indices[n_size-2] == index){
                 //Shift end elements and remove end:
-                neighborhoods[n].indices[n_size-2]=neighborhoods[n].indices[n_size-1];
-                neighborhoods[n].costs[n_size-2]=neighborhoods[n].costs[n_size-1];
-                //                neighborhoods[n].paths[neighborhoods[n].size].num_cells= 0;
-                neighborhoods[n].size -=1;
+                neighborhoodsF[n].indices[n_size-2]=neighborhoodsF[n].indices[n_size-1];
+                neighborhoodsF[n].costs[n_size-2]=neighborhoodsF[n].costs[n_size-1];
+                neighborhoodsF[n].cache[n_size-2]=neighborhoodsF[n].cache[n_size-1];
+                copy_polystate(&(neighborhoodsF[n].paths[n_size-2]),&(neighborhoodsF[n].paths[n_size-1]));
+                neighborhoodsF[n].size -=1;
             }
+#ifdef FMT_WARNING
+            if(find_element(neighborhoodsF[n].indices, neighborhoodsF[n].size, index)!= -1)
+                printf("******************************************* Error: neighborhoodF not reset properly\n");
             //            neighborhoods[index].paths[i_n].num_cells = 0;
+#endif
         }
         // Reset neighborhood at index
-        neighborhoods[index].size = 0;
-    }else if(parameters.connection_type == KNN_CON){
-            // clear cache
-            // Remove from neighborhood of every neighbor. Because these are added at the end, only need to check last two:
-            for(int i_n = 0; i_n < neighborhoods[index].size; i_n++){
-                //            neighborhoods[index].cache[i_n] = CACHE_UNK;
-                // check neighbor's end points for target:
-                int n = neighborhoods[index].indices[i_n];
-                int n_size = neighborhoods[n].size;
-                
-                // Check last item
-                if(n_size >= 1 && neighborhoods[n].indices[n_size-1] == index){
-                    // Delete the path:
-                    //                neighborhoods[n].paths[neighborhoods[n].size].num_cells = 0;
-                    //Remove end elements by forgetting they exist:
-                    neighborhoods[n].size -=1;
-                }else if(n_size >= 2 && neighborhoods[n].indices[n_size-2] == index){
-                    //Shift end elements and remove end:
-                    neighborhoods[n].indices[n_size-2]=neighborhoods[n].indices[n_size-1];
-                    neighborhoods[n].costs[n_size-2]=neighborhoods[n].costs[n_size-1];
-                    //                neighborhoods[n].paths[neighborhoods[n].size].num_cells= 0;
-                    neighborhoods[n].cache[n_size-2] = neighborhoods[n].cache[n_size-1];
-                    copy_polystate(&(neighborhoods[n].paths[n_size-2]),&(neighborhoods[n].paths[n_size-1]));
-                    neighborhoods[n].size -=1;
-                }
-                //            neighborhoods[index].paths[i_n].num_cells = 0;
+        neighborhoodsF[index].size = 0;
+        
+        // Now reset reverse neighborhood:
+        // Remove from neighborhood of every neighbor. Because these are added at the end, only need to check last two:
+        for(int n = 0; n < parameters.num_pts; n++){
+            // check neighbor's end points for target:
+            int n_size = neighborhoodsR[n].size;
+            
+            // Check last item
+            if(n_size >= 1 && neighborhoodsR[n].indices[n_size-1] == index){
+                //Remove end elements by forgetting they exist:
+                neighborhoodsR[n].size -=1;
+            }else if(n_size >= 2 && neighborhoodsR[n].indices[n_size-2] == index){
+                //Shift end elements and remove end:
+                neighborhoodsR[n].indices[n_size-2]=neighborhoodsR[n].indices[n_size-1];
+                neighborhoodsR[n].costs[n_size-2]=neighborhoodsR[n].costs[n_size-1];
+                neighborhoodsR[n].cache[n_size-2]=neighborhoodsR[n].cache[n_size-1];
+                copy_polystate(&(neighborhoodsR[n].paths[n_size-2]),&(neighborhoodsR[n].paths[n_size-1]));
+                neighborhoodsR[n].size -=1;
             }
-            // Reset neighborhood at index
-            neighborhoods[index].size = 0;
+#ifdef FMT_WARNING
+            if(find_element(neighborhoodsR[n].indices, neighborhoodsR[n].size, index)!= -1)
+                printf("******************************************* Error: neighborhoodF not reset properly\n");
+            //            neighborhoods[index].paths[i_n].num_cells = 0;
+#endif
+        }
+        // Reset neighborhood at index
+        neighborhoodsR[index].size = 0;
+        
     }else{
         printf("Error (2) : Unknown connection type %d!\n", parameters.connection_type);
         return false;
@@ -714,19 +930,21 @@ bool FMT::reset_neighborhood(int index){
 }
 
 // Computes a single neighborhood
-bool FMT::compute_neighborhood(Point pt, int index, Map* map){
-    
-    if(!is_initialized){
-        printf("Call to compute_neighborhood before initialization is complete. \n");
-        return false;
-    }
-    
-    if(&(neighborhoods[index]) == NULL){
+bool FMT::compute_neighborhood(int index, Map* map, bool rev){
+    if(&(neighborhoodsF[index]) == NULL || &(neighborhoodsR[index])==NULL){
         printf("Call to FMT with uninitialized neighborhood for point %d\n", index);
         return false;
     }
-    
-    neighborhoods[index].size = 0;
+
+    Neighborhood* nF = neighborhoodsF;
+    Neighborhood* nR = neighborhoodsR;
+    // In nearly all circumstances, we look forward. The exception is the goal point, or when we specify.
+    if( index == goal_pt_ind || rev){
+        rev = true;
+        nF = neighborhoodsR;
+        nR = neighborhoodsF;
+    }
+    nF[index].size = 0;
     
     if(parameters.connection_type == RAD_CON){
         // Radially connected neighbors
@@ -738,81 +956,66 @@ bool FMT::compute_neighborhood(Point pt, int index, Map* map){
         float coeff = (parameters.X_limit*parameters.Y_limit*log(parameters.num_pts))/(dim*parameters.num_pts*1.1);
         parameters.connection_param = 2.2*powf(coeff, 1/dim);
         
-        for(int j = 0; j < parameters.num_pts && neighborhoods[index].size < max_neighborhood_size; j++){
+        // Compute forward neighborhood, fill in neighbor's reverse neighborhoods
+        for(int j = 0; j < parameters.num_pts && nF[index].size < max_neighborhood_size; j++){
             if(j==index)
                 continue;
             
-            PolyState* p = &(neighborhoods[index].paths[neighborhoods[index].size]);
+            PolyState* p = &(nF[index].paths[nF[index].size]);
+            Point tmp_point;
             
-            float d = smoother->fit_polynomial(p, points[index].state, POLY_ORD, points[j].state, POLY_ORD, map);
-
+            float d = 0;
+            
+            if(rev || index == goal_pt_ind){
+                d = smoother->fit_polynomial(p, points[j].state, POLY_ORD, points[index].state, POLY_ORD, map);
+#ifdef FMT_WARNING
+                get_poly_der(*p, p->duration, &tmp_point, 0);
+                if(dist(tmp_point, points[index].state[0]) > 1.0){
+                    
+                    printf("WARNING: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[index].state[0].x,points[index].state[0].y,points[index].state[0].z);
+                }
+#endif
+            }else{
+                d = smoother->fit_polynomial(p, points[index].state, POLY_ORD, points[j].state, POLY_ORD, map);
+#ifdef FMT_WARNING
+                get_poly_der(*p, p->duration, &tmp_point, 0);
+                if(dist(tmp_point, points[j].state[0]) > 1.0){
+                    printf("WARNING: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[index].state[0].x,points[index].state[0].y,points[index].state[0].z);
+                }
+#endif
+            }
+            
+            
+            if(d < 0)
+                continue;
+            
             if(true || d < parameters.connection_param)
             {
-
-                bool collision_value = false;
-                for(int i = 0; i < (neighborhoods[index].paths[neighborhoods[index].size]).num_cells; i++){
-                    if(!(map->is_free((neighborhoods[index].paths[neighborhoods[index].size]).cells[i]))){
-                        collision_value = true;
-                        break;
-                    }
-                }
-//                collision_value=false;
-                
-                if(!collision_value){
-                    // Add to neighbor list
-
-                    if(neighborhoods[index].size < max_neighborhood_size){
-                        neighborhoods[index].indices[neighborhoods[index].size] = j;
-                        neighborhoods[index].costs[neighborhoods[index].size] = (neighborhoods[index].paths[neighborhoods[index].size]).cost;
-                        neighborhoods[index].cache[neighborhoods[index].size] = CACHE_FREE;
-                        neighborhoods[index].size += 1;
-                    }
+                // Add to own neighbor list
+                if(nF[index].size < max_neighborhood_size){
+                    nF[index].indices[nF[index].size] = j;
+                    nF[index].costs[nF[index].size] = (nF[index].paths[nF[index].size]).cost;
+                    nF[index].cache[nF[index].size] = CACHE_FREE;
+                    nF[index].size += 1;
                     
-                    // Since r-connected graphs are bidirectional, add to other neighborhood
-                    if(neighborhoods[j].size < max_neighborhood_size){
-                        printf("adding to neighbor\n");
-                        printf("This does not work right (RADCON form neighborhoods)");
-                        neighborhoods[j].indices[neighborhoods[j].size] = index;
-                        neighborhoods[j].costs[neighborhoods[j].size]   = (neighborhoods[index].paths[neighborhoods[index].size]).cost;
-                        neighborhoods[j].cache[neighborhoods[j].size]   = CACHE_FREE;
-                        // Need to copy polystate...
-                        PolyState* p_j = &(neighborhoods[j].paths[neighborhoods[j].size]);
-                        for(int o = 0; o < p->order; o++){
-                            p_j->coefficients_x[o] = p->coefficients_x[o];
-                            p_j->coefficients_y[o] = p->coefficients_y[o];
-                            p_j->coefficients_z[o] = p->coefficients_z[o];
-                            p_j->coefficients_p[o] = p->coefficients_p[o];
-                        }
-                        p_j->duration = p->duration;
-                        p_j->order = p->order;
-                        p_j->num_cells = p->num_cells;
-                        if(p_j->cells == NULL)
-                            p_j->cells = new size_t[MAX_POLY_CELLS];
-                        for(int c = 0; c < p->num_cells; c++)
-                            p_j->cells[c] = p->cells[c];
-                        p_j->reverse = !p->reverse;
-                        p_j->cost = p->cost;
-                        neighborhoods[j].size += 1;
-                    }else{
-//                        printf("Neighbor full\n");
+                    // Since r-connected graphs are bidirectional, add to neighbor's neighborhood:
+                    if(nR[j].size < max_neighborhood_size){
+                        nR[j].indices[nR[j].size] = index;
+                        nR[j].costs[nR[j].size]   = nF[index].costs[nF[index].size-1];
+                        nR[j].cache[nR[j].size]   = CACHE_FREE;
+                        copy_polystate(&(nR[j].paths[nR[j].size]), &(nF[index].paths[nF[index].size-1]));
+                        nR[j].size += 1;
                     }
-                }else{
-                    
                 }
 
             }
         }
-#ifdef FMT_DEBUG
-        if(neighborhoods[index].size <= 10)
-            printf("Warning: neighborhood for %d only has %d elements\n", index, neighborhoods[index].size);
-#endif
-        // TODO: Sort the neighborhood by distance (? not sure if it will improve performance at all)
-        return true;
-
+        
     }else if(parameters.connection_type==KNN_CON){
         
         // Placeholder polynomial
         PolyState p;
+        Point tmp_point;
         p.cells = new size_t[MAX_POLY_CELLS];
         
         // Set bound to inf
@@ -820,270 +1023,213 @@ bool FMT::compute_neighborhood(Point pt, int index, Map* map){
         // Index of the furthest neighbor
         int bound_index = -1;
         
-        for(int j = 0; j < parameters.num_pts; j++){
+        for(int j = 0; j < parameters.num_pts+2; j++){
             if(index==j) continue;
+            if((index!=start_pt_ind || index!= goal_pt_ind) && (j >= parameters.num_pts) ) continue;
+                
             
             // If we either have too few neighbors, or point j might be a nearest neighbor:
-            if(neighborhoods[index].size + 1 < parameters.connection_param){
-                // Compute the polynomial:
-                float d = smoother->fit_polynomial(&p, points[index].state, POLY_ORD, points[j].state, POLY_ORD, map);
-                if(d < 0)
-                    continue;
-                if(neighborhoods[index].size + 1 < parameters.connection_param || d < bound){
-                    if(neighborhoods[index].size+1 > parameters.connection_param){
-                        if(bound_index == -1){
-                            printf("Error - trying to remove -1 indexed element. Size: %d, bound %f\n", neighborhoods[index].size,bound);
-                            continue;
-                        }
-                        // Remove the furthest neighbor:
-                        // Since we want to preserve ordering in terms of index, remove by copying up.
-                        for(int k = bound_index+1; k < neighborhoods[index].size; k++){
-                            // Index of neighbor:
-                            neighborhoods[index].indices[k-1] = neighborhoods[index].indices[k];
-                            // Cost
-                            neighborhoods[index].costs[k-1] = neighborhoods[index].costs[k];
-                            // Cache (though all should be unknown anyway)
-                            neighborhoods[index].cache[k-1] = neighborhoods[index].cache[k];
-                            // Path - might need to implement copy constructor?
-                            if(neighborhoods[index].paths[k-1].cells == NULL)
-                                printf("%d, %d has null cells in path\n", index, k-1);
-                            if(neighborhoods[index].paths[k].cells == NULL)
-                                printf("%d, %d has null cells in path\n", index, k);
-                            
-                            copy_polystate(&(neighborhoods[index].paths[k-1]), &(neighborhoods[index].paths[k]));
-                        }
+            // Compute the polynomial:
+            float d = 0;
+            if(rev || index == goal_pt_ind){
+                d = smoother->fit_polynomial(&p, points[j].state, POLY_ORD, points[index].state, POLY_ORD, map);
+#ifdef FMT_WARNING
+                get_poly_der(p, p.duration, &tmp_point, 0);
+                if(dist(tmp_point, points[index].state[0]) > 1.0){
+                    printf("Error: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[index].state[0].x,points[index].state[0].y,points[index].state[0].z);
+                }
+#endif
+            }else{
+                d = smoother->fit_polynomial(&p, points[index].state, POLY_ORD, points[j].state, POLY_ORD, map);
+#ifdef FMT_WARNING
+                get_poly_der(p, p.duration, &tmp_point, 0);
+                if(dist(tmp_point, points[j].state[0]) > 1.0){
+                    printf("Error: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[j].state[0].x,points[j].state[0].y,points[j].state[0].z);
+                }
+#endif
+            }
+            
+
+            if(d < 0)
+                continue;
+            
+            
+            if(nF[index].size + 1 < parameters.connection_param || d < bound || (j==goal_pt_ind&&index==start_pt_ind)){
+                if(nF[index].size+1 > parameters.connection_param){
+                    if(bound_index == -1){
+                        printf("Error - trying to remove -1 indexed element. Size: %d, bound %f\n", nF[index].size,bound);
+                        continue;
                     }
-                    // Add to neighbor list
-                    neighborhoods[index].indices[neighborhoods[index].size] = j;
-                    neighborhoods[index].costs[neighborhoods[index].size] = p.cost;
-                    neighborhoods[index].cache[neighborhoods[index].size] = CACHE_UNK;
+                    // Remove the furthest neighbor:
+                    // Since we want to preserve ordering in terms of index, remove by copying up.
                     
-                    // Make sure this copies.
-                    copy_polystate(&(neighborhoods[index].paths[neighborhoods[index].size]),&p);
-
-                    
-                    // Add self to neighbor's list:
-                    if(neighborhoods[j].size < max_neighborhood_size){
+                    for(int k = bound_index; k < nF[index].size; k++){
+                        // Index of neighbor:
+                        nF[index].indices[k] = nF[index].indices[k+1];
+                        // Cost
+                        nF[index].costs[k] = nF[index].costs[k+1];
+                        // Cache (though all should be unknown anyway)
+                        nF[index].cache[k] = nF[index].cache[k+1];
+                        // Path
+                        if(nF[index].paths[k].cells == NULL)
+                            printf("%d, %d has null cells in path\n", index, k);
+                        if(nF[index].paths[k+1].cells == NULL)
+                            printf("%d, %d has null cells in path\n", index, k+1);
                         
-                        // Need to recompute the polynomial, since reverse flag does not work right.
-                        float d = smoother->fit_polynomial(&p, points[j].state, POLY_ORD, points[index].state, POLY_ORD, map);
-                        
-                        if(d == -1) // Means polynomial is somehow invalid.
-                            continue;
+                        copy_polystate(&(nF[index].paths[k]), &(nF[index].paths[k+1]));
+                    }
+                    // Now forget this element exists
+                    nF[index].size -= 1;
+                }
+                
+                // Add to neighbor list
+                nF[index].indices[nF[index].size] = j;
+                nF[index].costs[nF[index].size] = p.cost;
+                nF[index].cache[nF[index].size] = CACHE_UNK;
+                
+                // Make sure this copies.
+                copy_polystate(&(nF[index].paths[nF[index].size]),&p);
 
-                        neighborhoods[j].indices[neighborhoods[j].size] = index;
-                        neighborhoods[j].costs[neighborhoods[j].size] = p.cost;
-                        neighborhoods[j].cache[neighborhoods[j].size] = CACHE_UNK;
-                        copy_polystate(&(neighborhoods[j].paths[neighborhoods[j].size]), &p);
+                // Add self to neighbor's list if the start or goal point:
+                if( (index == start_pt_ind || index == goal_pt_ind) && nR[j].size < max_neighborhood_size){
+                    if(find_element(nR[j].indices, nR[j].size, index)==-1){
+                        nR[j].indices[nR[j].size] = index;
+                        nR[j].costs[nR[j].size] = p.cost;
+                        nR[j].cache[nR[j].size] = CACHE_UNK;
+                        copy_polystate(&(nR[j].paths[nR[j].size]), &p);
                         // Increment size:
-                        neighborhoods[j].size += 1;
+                        nR[j].size += 1;
                     }
-                    
-                    
-                    
-                    // If you did not replace a neighbor, increment size
-                    if(neighborhoods[index].size+1 <= parameters.connection_param){
-                        neighborhoods[index].size++;
+                }
+                
+                // If you did not replace a neighbor, increment size
+                if(nF[index].size+1 <= parameters.connection_param){
+                    nF[index].size++;
+                }
+                
+                // Now recompute the bound. Could do this somewhat more efficiently, but I don't think it is worth it.
+                bound = 0;
+                for(int k = 0; k < nF[index].size; k++){
+                    if(nF[index].costs[k] >= bound){
+                        bound = nF[index].costs[k];
+                        bound_index = k;
                     }
-                    
-                    // Now recompute the bound. Could do this somewhat more efficiently, but I don't think it is worth it.
-                    bound = 0;
-                    for(int k = 0; k < neighborhoods[index].size; k++){
-                        if(neighborhoods[index].costs[k] >= bound){
-                            bound = neighborhoods[index].costs[k];
-                            bound_index = k;
-                        }
-                    }
-                    //printf("Bound set to %f\n", bound);
                 }
             }
         }
 
         delete [] p.cells;
         
-        return true;
 
     }else{
         printf("Error (1): Unknown connection type %d!\n", parameters.connection_type);
         return false;
     }
+
+    
+    return true;
+
 }
 
 // Computes neighborhoods for sampled points (NOT initial, final point)
-bool FMT::compute_neighborhoods(Map* map_structure){
+bool FMT::initialize_neighborhoods(Map* map_structure){
     
-    neighborhoods = new Neighborhood[(parameters.num_pts+2)];
+    neighborhoodsF = new Neighborhood[(parameters.num_pts+2)];
+    neighborhoodsR = new Neighborhood[(parameters.num_pts+2)];
     
     //Initialize neighborhoods
     for(int i = 0; i < parameters.num_pts+2; i++){
-        neighborhoods[i].size = 0;
-        neighborhoods[i].indices = new int[max_neighborhood_size];
-        neighborhoods[i].costs   = new float[max_neighborhood_size];
-        neighborhoods[i].cache   = new uint8_t[max_neighborhood_size];
-        neighborhoods[i].paths   = new PolyState[max_neighborhood_size];
+        neighborhoodsF[i].size = 0;
+        neighborhoodsF[i].indices = new int[max_neighborhood_size];
+        neighborhoodsF[i].costs   = new float[max_neighborhood_size];
+        neighborhoodsF[i].cache   = new uint8_t[max_neighborhood_size];
+        neighborhoodsF[i].paths   = new PolyState[max_neighborhood_size];
         // Likely unnecessary.
         for(int j = 0; j < max_neighborhood_size; j++){
-            neighborhoods[i].cache[j] = CACHE_UNK;
-            neighborhoods[i].paths[j].cells = new size_t[MAX_POLY_CELLS];
+            neighborhoodsF[i].cache[j] = CACHE_UNK;
+            neighborhoodsF[i].paths[j].cells = new size_t[MAX_POLY_CELLS];
+        }
+        
+        neighborhoodsR[i].size = 0;
+        neighborhoodsR[i].indices = new int[max_neighborhood_size];
+        neighborhoodsR[i].costs   = new float[max_neighborhood_size];
+        neighborhoodsR[i].cache   = new uint8_t[max_neighborhood_size];
+        neighborhoodsR[i].paths   = new PolyState[max_neighborhood_size];
+        // Likely unnecessary.
+        for(int j = 0; j < max_neighborhood_size; j++){
+            neighborhoodsR[i].cache[j] = CACHE_UNK;
+            neighborhoodsR[i].paths[j].cells = new size_t[MAX_POLY_CELLS];
         }
     }
-    if(parameters.connection_type == RAD_CON){
-        // Radially connected neighbors
-        float dim = 2.0;
-        if(parameters.Z_limit > 0)
-            dim = 3.0;
-        
-        // Coefficient from equation (3) of FMT* paper (Janson, Schmerling, et al.)
-        // Not sure what xi is in their equation (tuning parameter??)
-        float coeff = (parameters.X_limit*parameters.Y_limit*log(parameters.num_pts))/(dim*parameters.num_pts*1.1);
-        parameters.connection_param = 2.2*powf(coeff, 1/dim);
-        
-        PolyState* p;
-        
-        // Radially connected neighbors
-        for(int i = 0; i < parameters.num_pts; i++){
-            for(int j = 0; j < parameters.num_pts; j++){
-                if(i==j) continue;
-                
-                // Fit a polynomial:
-                p = &(neighborhoods[i].paths[neighborhoods[i].size]);
-                float d = smoother->fit_polynomial(p, points[i].state, POLY_ORD, points[j].state, POLY_ORD, map_structure);
-                if(d < parameters.connection_param)
-                {
-                    // Add to neighbor list
-                    neighborhoods[i].indices[neighborhoods[i].size] = j;
-                    neighborhoods[i].costs[neighborhoods[i].size] = p->cost;
-                    neighborhoods[i].cache[neighborhoods[i].size] = CACHE_UNK;
-                    // Path already copied above.
-                    neighborhoods[i].size += 1;
-                    if(neighborhoods[i].size >= max_neighborhood_size){
-#ifdef FMT_DEBUG
-                        printf("Warning: Neighborhood larger than specified maximum size\n");
-#endif
-                        break; // This is a hack
-                    }
-                }
-            }
-            
-#ifdef FMT_DEBUG
-            if(neighborhoods[i].size <= 10)
-                printf("Warning: neighborhood for %d only has %d elements\n", i, neighborhoods[i].size);
-#endif
-        }
-        return true;
-    }else if(parameters.connection_type==KNN_CON){
-        
-        // Placeholder polynomial
-        PolyState p;
-        p.cells = new size_t[MAX_POLY_CELLS];
-        
-        for(int i = 0; i < parameters.num_pts; i++){
-            // Set bound to inf
-            float bound = MAXFLOAT;
-            // Index of the furthest neighbor
-            int bound_index = -1;
-
-            for(int j = 0; j < parameters.num_pts; j++){
-                if(i==j) continue;
-                
-                // If we either have too few neighbors, or point j might be a nearest neighbor:
-                if(neighborhoods[i].size + 1 < parameters.connection_param){
-                    // Compute the polynomial:
-                    float d = smoother->fit_polynomial(&p, points[i].state, POLY_ORD, points[j].state, POLY_ORD, map_structure);
-                    if(d == -1) // Means polynomial is somehow invalid.
-                        continue;
-                    if(neighborhoods[i].size + 1 <= parameters.connection_param ||  d < bound){
-                        if(neighborhoods[i].size+1 > parameters.connection_param){
-                            // Remove the furthest neighbor:
-                            // Since we want to preserve ordering in terms of index, remove by copying up.
-                            for(int k = bound_index+1; k < neighborhoods[i].size; k++){
-                                // Index of neighbor:
-                                neighborhoods[i].indices[k-1] = neighborhoods[i].indices[k];
-                                // Cost
-                                neighborhoods[i].costs[k-1] = neighborhoods[i].costs[k];
-                                // Cache (though all should be unknown anyway)
-                                neighborhoods[i].cache[k-1] = neighborhoods[i].cache[k];
-                                // Path - might need to implement copy constructor?
-                                copy_polystate(&(neighborhoods[i].paths[k-1]), &(neighborhoods[i].paths[k]));
-                            }
-                        }
-                        
-                        // Add to neighbor list
-                        neighborhoods[i].indices[neighborhoods[i].size] = j;
-                        neighborhoods[i].costs[neighborhoods[i].size] = p.cost;
-                        neighborhoods[i].cache[neighborhoods[i].size] = CACHE_UNK;
-                        // Make sure this copies.
-                        copy_polystate(&(neighborhoods[i].paths[neighborhoods[i].size]),&p);
-                        
-                        // If you did not replace a neighbor, increment size
-                        if(neighborhoods[i].size+1 <= parameters.connection_param){
-                            neighborhoods[i].size++;
-                        }
-                        
-                        // Now recompute the bound. Could do this somewhat more efficiently, but I don't think it is worth it.
-                        bound = 0;
-                        for(int k = 0; k < neighborhoods[i].size; k++){
-                            if(neighborhoods[i].costs[k] > bound){
-                                bound = neighborhoods[i].costs[k];
-                                bound_index = k;
-                            }
-                        }
-                    }else{
-
-                    }
-                }
-            }
-        }
-        
-        delete [] p.cells;
-        
-        return true;
-    }else{
-        printf("Error (3): Unsupported connection type %d!\n", parameters.connection_type);
-        return false;
+    
+    for(int i = 0; i < parameters.num_pts; i++){
+        if(!compute_neighborhood(i, map_structure))
+            return false;
     }
+    
+    for(int i = 0; i < parameters.num_pts; i++){
+        if(neighborhoodsR[i].size==0){
+            if(!compute_neighborhood(i, map_structure,true))
+                return false;
+        }
+    }
+    return true;
 }
 
 
 void FMT::clear_cache(){
     for(int i = 0; i < parameters.num_pts; i++){
-        for(int j = 0; j < neighborhoods[i].size; j++){
-            if(neighborhoods[i].cache[j] == CACHE_FREE_U || neighborhoods[i].cache[j] == CACHE_OCC_U){
-                neighborhoods[i].cache[j] = CACHE_UNK;
+        for(int j = 0; j < neighborhoodsF[i].size; j++){
+            if(neighborhoodsF[i].cache[j] == CACHE_FREE_U || neighborhoodsF[i].cache[j] == CACHE_OCC_U){
+                neighborhoodsF[i].cache[j] = CACHE_UNK;
+            }
+        }
+    }
+    for(int i = 0; i < parameters.num_pts; i++){
+        for(int j = 0; j < neighborhoodsR[i].size; j++){
+            if(neighborhoodsR[i].cache[j] == CACHE_FREE_U || neighborhoodsR[i].cache[j] == CACHE_OCC_U){
+                neighborhoodsR[i].cache[j] = CACHE_UNK;
             }
         }
     }
 }
 
+
+
 // Checks for collision using cache to speed up.
+// ind1 is assumed to be forward from ind2, meaning ind2 should be in neighborhoodR[ind1], and ind1 in neighborhoodF[ind2]
+
 bool FMT::collision_inds(int ind1, int ind2, Map *map){
     num_total_checks++;
+    
     // ====  First find neighbor indices: ==== //
     int neighb_1 = -1; // Index of ind2 in ind1's neighbor list
     int neighb_2 = -1; // Index of ind1 in ind2's neighbor list
     
-    neighb_1 = find_element(neighborhoods[ind1].indices, neighborhoods[ind1].size, ind2);
-    neighb_2 = find_element(neighborhoods[ind2].indices, neighborhoods[ind2].size, ind1);
+    neighb_1 = find_element(neighborhoodsR[ind1].indices, neighborhoodsR[ind1].size, ind2);
+    neighb_2 = find_element(neighborhoodsF[ind2].indices, neighborhoodsF[ind2].size, ind1);
+    Neighborhood* n2 = &(neighborhoodsF[ind2]);
+    Neighborhood* n1 = &(neighborhoodsR[ind1]);
     
     // ==== Check for collisions unless an answer is already cached ==== //
     // Case 1: Not in each others' neighborhoods so cache is irrelevant
     if(neighb_1 == -1 && neighb_2 == -1){
         // Not in each other's neighborhoods, which is not good.
 #ifdef FMT_DEBUG
-        printf("Warning - skipping check because not in neighborhoods\n");
+            printf("Warning - skipping check because not in neighborhoods\n");
 #endif
-        return true;
+            return true;
     }
-    
+
     // If one has collision cached, treat as collision.
-    if( (neighb_1 != -1 && neighborhoods[ind1].cache[neighb_1] >= CACHE_OCC) || (neighb_2 != -1 && neighborhoods[ind2].cache[neighb_2] >= CACHE_OCC)){
+    if( (neighb_1 != -1 && n1->cache[neighb_1] >= CACHE_OCC) || (neighb_2 != -1 && n2->cache[neighb_2] >= CACHE_OCC)){
 //        printf("Cached collision\n");
         num_skipped_checks++;
         return true;
     }
     
     // If one has free (we already know neither has collision), then return false
-    if( (neighb_1 != -1 && (neighborhoods[ind1].cache[neighb_1] == CACHE_FREE || neighborhoods[ind1].cache[neighb_1] == CACHE_FREE_U)) || (neighb_2 != -1 && (neighborhoods[ind2].cache[neighb_2] == CACHE_FREE || neighborhoods[ind2].cache[neighb_2] == CACHE_FREE_U))){
+    if( (neighb_1 != -1 && (n1->cache[neighb_1] == CACHE_FREE || n1->cache[neighb_1] == CACHE_FREE_U)) || (neighb_2 != -1 && (n2->cache[neighb_2] == CACHE_FREE || n2->cache[neighb_2] == CACHE_FREE_U))){
         num_skipped_checks++;
         return false;
     }
@@ -1096,19 +1242,19 @@ bool FMT::collision_inds(int ind1, int ind2, Map *map){
     
     PolyState* p;
     if(neighb_1 != -1){
-        p = &(neighborhoods[ind1].paths[neighb_1]);
+        p = &(n1->paths[neighb_1]);
     }else{
-        p = &(neighborhoods[ind2].paths[neighb_2]);
+        p = &(n2->paths[neighb_2]);
     }
     
     bool collision_value = false; // Need a collision method which checks indices of the polynomial.
     if(p == nullptr || p->cells == nullptr ){
         collision_value = true;
     }else{
-        
         for(int i = 0; i < p->num_cells; i++){
             if(!(map->is_free(p->cells[i]))){
                 collision_value = true;
+                confirmed_value = true;
                 break;
             }
         }
@@ -1117,26 +1263,26 @@ bool FMT::collision_inds(int ind1, int ind2, Map *map){
     if(collision_value == true){
         if(confirmed_value){
             if(neighb_1 != -1)
-                neighborhoods[ind1].cache[neighb_1] = CACHE_OCC;
+                n1->cache[neighb_1] = CACHE_OCC;
             if(neighb_2 != -1)
-                neighborhoods[ind2].cache[neighb_2] = CACHE_OCC;
+                n2->cache[neighb_2] = CACHE_OCC;
         }else{
             if(neighb_1 != -1)
-                neighborhoods[ind1].cache[neighb_1] = CACHE_OCC_U;
+                n1->cache[neighb_1] = CACHE_OCC_U;
             if(neighb_2 != -1)
-                neighborhoods[ind2].cache[neighb_2] = CACHE_OCC_U;
+                n2->cache[neighb_2] = CACHE_OCC_U;
         }
     }else{
         if(confirmed_value){
             if(neighb_1 != -1)
-                neighborhoods[ind1].cache[neighb_1] = CACHE_FREE;
+                n1->cache[neighb_1] = CACHE_FREE;
             if(neighb_2 != -1)
-                neighborhoods[ind2].cache[neighb_2] = CACHE_FREE;
+                n2->cache[neighb_2] = CACHE_FREE;
         }else{
             if(neighb_1 != -1)
-                neighborhoods[ind1].cache[neighb_1] = CACHE_FREE_U;
+                n1->cache[neighb_1] = CACHE_FREE_U;
             if(neighb_2 != -1)
-                neighborhoods[ind2].cache[neighb_2] = CACHE_FREE_U;
+                n2->cache[neighb_2] = CACHE_FREE_U;
         }
     }
     
