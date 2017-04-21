@@ -250,12 +250,35 @@ int FMT::fmtstar(Point start, Point goal, Map* map, PolyState* path){
     points[goal_pt_ind].state[0].x  = goal.x;
     points[goal_pt_ind].state[0].y  = goal.y;
     points[goal_pt_ind].state[0].z  = goal.z;
-    points[start_pt_ind].state[1].x = 0;
-    points[start_pt_ind].state[1].y = 0;
-    points[start_pt_ind].state[1].z = 0;
-    points[start_pt_ind].state[2].x = 0;
-    points[start_pt_ind].state[2].y = 0;
-    points[start_pt_ind].state[2].z = 0;
+    points[goal_pt_ind].state[1].x = 0;
+    points[goal_pt_ind].state[1].y = 0;
+    points[goal_pt_ind].state[1].z = 0;
+    points[goal_pt_ind].state[2].x = 0;
+    points[goal_pt_ind].state[2].y = 0;
+    points[goal_pt_ind].state[2].z = 0;
+    
+    
+    
+/*
+    // Try to connect directly:
+    float d = smoother->fit_polynomial(&(path[1]), points[start_pt_ind].state, POLY_ORD, points[goal_pt_ind].state, POLY_ORD, map);
+    if(d >= 0){
+        // Check for collision:
+        bool free = true;
+        for(int c = 0; c < path[1].num_cells; c++)
+            free = free && map->is_free(path[1].cells[c]);
+        
+        if(free){
+            printf("Direct shortcut!\n");
+            path[0].cost = path[1].cost;
+            return 1;
+        }
+    }
+
+
+ */
+    
+    
     
     reset_neighborhood(start_pt_ind);
     reset_neighborhood(goal_pt_ind);
@@ -296,12 +319,28 @@ int FMT::fmtstar(Point start, Point goal, Point goal_vel, Map* map, PolyState* p
     points[goal_pt_ind].state[0].x  = goal.x;
     points[goal_pt_ind].state[0].y  = goal.y;
     points[goal_pt_ind].state[0].z  = 0*goal.z;
-    points[start_pt_ind].state[1].x = goal_vel.x;
-    points[start_pt_ind].state[1].y = goal_vel.y;
-    points[start_pt_ind].state[1].z = 0*goal_vel.z;
-    points[start_pt_ind].state[2].x = 0;
-    points[start_pt_ind].state[2].y = 0;
-    points[start_pt_ind].state[2].z = 0;
+    points[goal_pt_ind].state[1].x = goal_vel.x;
+    points[goal_pt_ind].state[1].y = goal_vel.y;
+    points[goal_pt_ind].state[1].z = 0*goal_vel.z;
+    points[goal_pt_ind].state[2].x = 0;
+    points[goal_pt_ind].state[2].y = 0;
+    points[goal_pt_ind].state[2].z = 0;
+    /*
+    // Try to connect directly:
+    float d = smoother->fit_polynomial(&(path[1]), points[start_pt_ind].state, POLY_ORD, points[goal_pt_ind].state, POLY_ORD, map);
+    if(d >= 0){
+        // Check for collision:
+        bool free = true;
+        for(int c = 0; c < path[1].num_cells; c++)
+            free = free && map->is_free(path[1].cells[c]);
+        
+        if(free){
+            printf("Direct shortcut!\n");
+            path[0].cost = path[1].cost;
+            return 1;
+        }
+    }
+     */
     
     reset_neighborhood(start_pt_ind);
     reset_neighborhood(goal_pt_ind);
@@ -588,76 +627,28 @@ int FMT::plan_path(Map* map, PolyState* path){
         if(curr_ind == Parents[curr_ind]) // Error in path - loop
         {path_length = -1; break;}
         
+        // See if we can shortcut from the starting node. If so, skip the rest of the path generation.
+        if(Parents[curr_ind] != start_pt_ind){
+            float d = smoother->fit_polynomial(&(path[(parameters.num_pts+1)-path_length]), points[start_pt_ind].state, POLY_ORD, points[curr_ind].state, POLY_ORD, map);
+            if(d >= 0){
+                // Check for collision:
+                bool free = true;
+                for(int c = 0; c < path[(parameters.num_pts+1)-path_length].num_cells; c++)
+                    free = free && map->is_free(path[(parameters.num_pts+1)-path_length].cells[c]);
+                
+                if(free){
+                    printf("shortcut!\n");
+                    path_length++;
+                    start_ind = start_pt_ind;
+                    break;
+                }
+            }
+        }
+        
         //Insert appropriate polynomial in appropriate place of path:
         start_ind = Parents[curr_ind];
         copy_polystate(&(path[(parameters.num_pts+1)- path_length]), get_neighborhood_poly(start_ind, curr_ind));
         
-        
-#ifdef FMT_DEBUG
-        for(int c = 0; c < path[(parameters.num_pts+1)-path_length].num_cells; c++){
-            if(!map->is_free(path[(parameters.num_pts+1)-path_length].cells[c])){
-                printf("\n**********************************************************************************************\n");
-                printf("Error: Collision on path being returned. Occurs while traveling between %d: (%f,%f) and %d: (%f,%f). Cache reads:", start_ind, points[start_ind].state[0].x,points[start_ind].state[0].y, curr_ind, points[curr_ind].state[0].x,points[curr_ind].state[0].y);
-                   // See whether in start_ind's FORWARD neighborhood:
-                int ind = find_element(neighborhoodsF[start_ind].indices, neighborhoodsF[start_ind].size, curr_ind);
-                if(ind != -1){
-                        switch (neighborhoodsF[start_ind].cache[ind]) {
-                            case CACHE_FREE:
-                                printf("CACHE_FREE\n");
-                                break;
-                            case CACHE_FREE_U:
-                                printf("CACHE_FREE_U\n");
-                                break;
-                            case CACHE_OCC:
-                                printf("CACHE_OCC\n");
-                                break;
-                            case CACHE_OCC_U:
-                                printf("CACHE_OCC_U\n");
-                                break;
-                            case CACHE_UNK:
-                                printf("CACHE_UNK\n");
-                                break;
-                            default:
-                                printf("INVALID: %d\n", (neighborhoodsF[start_ind].cache[ind]));
-                                break;
-                        }
-                    neighborhoodsF[start_ind].cache[ind] = CACHE_OCC;
-                        printf("Item found in forward cache of start point\n");
-                    }else{
-                   // See whether in end_ind's reverse neighborhood:
-                   ind = find_element(neighborhoodsR[curr_ind].indices, neighborhoodsR[curr_ind].size, start_ind);
-                       if(ind != -1){
-                           switch (neighborhoodsR[curr_ind].cache[ind]) {
-                               case CACHE_FREE:
-                                   printf("CACHE_FREE\n");
-                                   break;
-                               case CACHE_FREE_U:
-                                   printf("CACHE_FREE_U\n");
-                                   break;
-                               case CACHE_OCC:
-                                   printf("CACHE_OCC\n");
-                                   break;
-                               case CACHE_OCC_U:
-                                   printf("CACHE_OCC_U\n");
-                                   break;
-                               case CACHE_UNK:
-                                   printf("CACHE_UNK\n");
-                                   break;
-                               default:
-                                   printf("INVALID: %d\n", (neighborhoodsR[curr_ind].cache[ind]));
-                                   break;
-                           }
-                           printf("Item found in reverse cache of end point\n");
-                           neighborhoodsR[curr_ind].cache[ind] = CACHE_OCC;
-                        }
-                }
-                
-                printf("**********************************************************************************************\n");
-                path[0].cost = -1;
-                return 0;
-        }
-        }
-#endif
         // Update costs
         if(path[(parameters.num_pts+1)-path_length].cost == -1){
             path_length = -1; break; // New segment is infeasible or not found
@@ -970,7 +961,7 @@ bool FMT::compute_neighborhood(int index, Map* map, bool rev){
                 d = smoother->fit_polynomial(p, points[j].state, POLY_ORD, points[index].state, POLY_ORD, map);
 #ifdef FMT_WARNING
                 get_poly_der(*p, p->duration, &tmp_point, 0);
-                if(dist(tmp_point, points[index].state[0]) > 1.0){
+                if(d > 0 && dist(tmp_point, points[index].state[0]) > 10.0){
                     
                     printf("WARNING: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[index].state[0].x,points[index].state[0].y,points[index].state[0].z);
                 }
@@ -979,7 +970,7 @@ bool FMT::compute_neighborhood(int index, Map* map, bool rev){
                 d = smoother->fit_polynomial(p, points[index].state, POLY_ORD, points[j].state, POLY_ORD, map);
 #ifdef FMT_WARNING
                 get_poly_der(*p, p->duration, &tmp_point, 0);
-                if(dist(tmp_point, points[j].state[0]) > 1.0){
+                if(d > 0 && dist(tmp_point, points[j].state[0]) > 10.0){
                     printf("WARNING: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[index].state[0].x,points[index].state[0].y,points[index].state[0].z);
                 }
 #endif
@@ -1035,7 +1026,7 @@ bool FMT::compute_neighborhood(int index, Map* map, bool rev){
                 d = smoother->fit_polynomial(&p, points[j].state, POLY_ORD, points[index].state, POLY_ORD, map);
 #ifdef FMT_WARNING
                 get_poly_der(p, p.duration, &tmp_point, 0);
-                if(dist(tmp_point, points[index].state[0]) > 1.0){
+                if(d > 0 && dist(tmp_point, points[index].state[0]) > 10.0){
                     printf("Error: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[index].state[0].x,points[index].state[0].y,points[index].state[0].z);
                 }
 #endif
@@ -1043,7 +1034,7 @@ bool FMT::compute_neighborhood(int index, Map* map, bool rev){
                 d = smoother->fit_polynomial(&p, points[index].state, POLY_ORD, points[j].state, POLY_ORD, map);
 #ifdef FMT_WARNING
                 get_poly_der(p, p.duration, &tmp_point, 0);
-                if(dist(tmp_point, points[j].state[0]) > 1.0){
+                if(d > 0 && dist(tmp_point, points[j].state[0]) > 10.0){
                     printf("Error: Polynomial does not reach goal (%f,%f,%f), (%f,%f,%f)!\n",tmp_point.x,tmp_point.y,tmp_point.z, points[j].state[0].x,points[j].state[0].y,points[j].state[0].z);
                 }
 #endif

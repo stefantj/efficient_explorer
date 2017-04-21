@@ -5,30 +5,21 @@
  ******************
 
  Top priority item is to move to a kinodynamic version.
- 
- Planning seems _ok_, but there's a big issue where the paths never seem to be executed all the way.
- 
- Hitting limit cycles within the planned path. Move base issue?
- 
- 
+
+ Working split physics and planning loops.
  
  **************
  Current focus:
  **************
  
  Make explorer recompute only if needed (e.g. if LOS extension of existing path gets you to the goal, then skip re-planning)
- 
- FMT sometimes remembers the previous goal (side effect of not resetting neighborhoods correctly). I think I've caught these now.
- 
- 
- 
- 
 
  *****************
  Summary of Issues
  *****************
  
  Polynomial issues:
+ > Occasionally we get a `split personality' for the path, where it appears to be (very quickly) alternating between two locations.
  > Cell checking is wasteful
  > Cost of the polynomial is not computed correctly
  > Should write a suite of basic tests to see if things function the way I expect them to

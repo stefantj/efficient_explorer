@@ -10,7 +10,7 @@
 //#define FMT_DEBUG
 #define FMT_TIMING
 //#define FMT_JULIA_DEBUG
-//#define FMT_WARNING
+#define FMT_WARNING
 
 // Connection types
 #define RAD_CON 1  // Radial

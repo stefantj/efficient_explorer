@@ -665,7 +665,6 @@ void assign_max(const std::vector<std::vector<double>>& cost, int* assignments, 
 }
 
 void assign_min(const std::vector<std::vector<double>>& cost, int* assignments, int num_agents){
-    
     std::vector<int> agent;
     std::vector<int> task;
     HungarianOptimizer hungarian_optimizer(cost);

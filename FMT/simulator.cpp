@@ -12,9 +12,18 @@
 #include "afghan_village.h"
 
 Simulator::Simulator(){
-    delta_time = 1;
-    plot_delay = 5;
-    replan_delay = 1;
+    // Time step for propogating the physics.
+    delta_time = 0.05;
+    // Used to re-scale the time parameter of the path.
+    path_scaling = 1.0;
+    // Delay for updating the map when creating a video
+    plot_delay = 50;
+    // Minimum time to wait before re-planning
+    min_replan_period = .3;
+    // Time the plan was last updated.
+    iter_last_planned = 0;
+    physics_iteration = 0;
+    need_replan = true;
 }
 
 void Simulator::init_video_file(FILE* f){
@@ -80,6 +89,8 @@ void Simulator::print_video_file(FILE* f, std::string filename, float time){
 
 void Simulator::run_simulator(int iters, int team_size){
     num_agents = team_size;
+    max_iters = iters;
+    
     if(team_size > MAX_NUM_AGENTS){
         printf("Error: team size too large! Maximum team is %d\n", MAX_NUM_AGENTS);
         return;
@@ -118,90 +129,8 @@ void Simulator::run_simulator(int iters, int team_size){
     plot_map.Z_dim = true_map.Z_dim;
     plot_map.data  = new char[400*300*1];
 
-    
-    
-    /*
-        Point path[100];
-        Point start, goal;
-        start.x = 75.0; start.y = 80.0; start.z = 0.0;
-        goal.x = 200.0; goal.y = 200.0; goal.z = 0.0;
-        
-        FMT F_dense = FMT(true_map.X_dim, true_map.Y_dim, 0, F_DENSE_PTS, RAD_CON, 0);
-        F_dense.clear_cache();
-        F_dense.fmtstar(start, goal, &true_map, path);
-    
-    start.x = 75.0; start.y = 80.0; start.z = 0.0;
-    goal.x = 50.0; goal.y = 100.0; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
 
-    start.x = 75.0; start.y = 80.0; start.z = 0.0;
-    goal.x = 50.0; goal.y = 200.0; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    start.x = 75.0; start.y = 80.0; start.z = 0.0;
-    goal.x = 150,0; goal.y = 110.0; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    start.x = 75.0; start.y = 80.0; start.z = 0.0;
-    goal.x = 40.0; goal.y = 25.0; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 54; goal.y = 108; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 82; goal.y = 113; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 44.5; goal.y = 88.5; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 26.2; goal.y = 82.5; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 27; goal.y = 64; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 45.6; goal.y = 41.5; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 103.5; goal.y = 32.0; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 144; goal.y = 33; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 153; goal.y = 33; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 172; goal.y = 20.7; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 172; goal.y = 67.8; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-    goal.x = 185; goal.y = 75; goal.z = 0.0;
-    F_dense.clear_cache();
-    F_dense.fmtstar(start, goal, &true_map, path);
-
-
-    return;
-*/
-
+    TimeVar compute_time = timeNow();
     for(int i = 0; i < num_agents; i++){
         printf("Making agent %d\n",i);
         agents[i].location.x = 4.0 +(i/2)*7.0;
@@ -217,6 +146,7 @@ void Simulator::run_simulator(int iters, int team_size){
         agents[i].planner->force_map_update(&true_map);
         agents[i].planner->clear_map();
     }
+    printf("Precomputation took %f seconds\n",(float)duration(timeNow()-compute_time)/float(1000000000));
     
     FILE* f = fopen("afghan_map.jl","w");
     save_julia_var(f, std::string("afghan_map"), &true_map);
@@ -235,46 +165,25 @@ void Simulator::run_simulator(int iters, int team_size){
     float compute_times[10000] = {0};
     float assign_times[10000]  = {0};
     float num_targets[10000]     = {0};
-    Point* position_values[num_agents];
-    Point* velocity_values[num_agents];
-    Point* acceleration_values[num_agents];
-    
+
     for(int i = 0; i < num_agents; i++){
         position_values[i] = new Point[iters];
         velocity_values[i] = new Point[iters];
         acceleration_values[i] = new Point[iters];
     }
     
-    for(int iteration = 0; iteration < iters; iteration++){
+    int planner_iteration = 0;
+    
+    while(physics_iteration < iters && planner_iteration < iters){
 #ifdef SIM_PLOT
         if(iteration%plot_delay==0)
             system("clear");
 #endif
         t_loop = timeNow();
         float realtime =(float)duration(timeNow()-t_real)/float(1000000000);
-        printf("Real time: %f s.  Sim time = %f s   (%f x)\n", realtime, float(iteration)*delta_time, (float(iteration)*delta_time)/realtime);
+        printf("Real time: %f s.  Sim time %f s   (%f x)\n", realtime, float(physics_iteration)*delta_time, (float(physics_iteration)*delta_time)/realtime);
         
-        Point true_location_buffer[num_agents];
-        Point agent_targets_buffer[num_agents];
-        
-    
-        for(int i = 0; i < num_agents; i++){
-            Point tmp;
 
-            position_values[i][iteration].x = agents[i].location.x;
-            position_values[i][iteration].y = agents[i].location.y;
-            position_values[i][iteration].z = agents[i].location.z;
-            
-            agents[i].planner->get_vel(&tmp);
-            velocity_values[i][iteration].x = tmp.x;
-            velocity_values[i][iteration].y = tmp.y;
-            velocity_values[i][iteration].z = tmp.z;
-            
-            agents[i].planner->get_acc(&tmp);
-            acceleration_values[i][iteration].x = tmp.x;
-            acceleration_values[i][iteration].y = tmp.y;
-            acceleration_values[i][iteration].z = tmp.z;
-        }
         
         
         // Communications handled here:
@@ -309,10 +218,11 @@ void Simulator::run_simulator(int iters, int team_size){
             }
         }
         
+        
+        
         // Agents need to get their measurements first.
         for(int i = 0; i < num_agents; i++){
             agents[i].planner->update_state(agent_location_buffer[i], num_agents);
-            
         }
         // Raytrace to get the measurements
         for(int i = 0; i < num_agents; i++){
@@ -325,10 +235,10 @@ void Simulator::run_simulator(int iters, int team_size){
         for(int i = 0; i < num_agents; i++){
             t_0 = timeNow();
             done = agents[i].planner->cluster_frontiers();
-            cluster_times[iteration] += float(duration(timeNow()-t_0)/num_agents);
+            cluster_times[planner_iteration] += float(duration(timeNow()-t_0)/num_agents);
             t_0 = timeNow();
-            num_targets[iteration]+=(float)agents[i].planner->compute_costs()/float(num_agents);
-            compute_times[iteration] += float(duration(timeNow()-t_0)/num_agents);
+            num_targets[planner_iteration]+=(float)agents[i].planner->compute_costs()/float(num_agents);
+            compute_times[planner_iteration] += float(duration(timeNow()-t_0)/num_agents);
             agent_num_clusters[i] = agents[i].planner->get_clusters(agent_clusters_buffer[i], agent_costs_buffer[i], MAX_NUM_GOALS);
         }
         
@@ -340,115 +250,61 @@ void Simulator::run_simulator(int iters, int team_size){
                 }
             }
         }
+        
+        if(planner_iteration > 0){
+            // Average cluster time ( unit seconds ):
+            float time_elapsed = (cluster_times[planner_iteration]+compute_times[planner_iteration])/float(1000000000);
+#ifdef SIM_DEBUG
+            printf("Spinning to compensate for %f seconds of planning\n", time_elapsed);
+#endif
+            // Now move the physics clock until we are synchronized:
+            for(int i = 0; float(i)*delta_time < time_elapsed; i++){
+                if(!spin())
+                    return;
+            }
+            
 
-        if(iteration%replan_delay == 0){
-            // Have them assign, returning target waypoint
-            for(int i = 0; i < num_agents; i++){
-                t_0 = timeNow();
-                agents[i].planner->assign(&agents[i].target);
-                assign_times[iteration]+=float(duration(timeNow()-t_0)/num_agents);
+            // Now wait if it is too soon to plan:
+            while(float(physics_iteration - iter_last_planned) <= min_replan_period/delta_time){
+#ifdef SIM_DEBUG
+                printf("Spinning to wait until valid replan time. \n");
+#endif
+                if(need_replan)
+                    break;
+                if(!spin())
+                    return;
+#ifdef SIM_DEBUG
+                printf("\t time to go: %f\n", min_replan_period/delta_time-float(physics_iteration - iter_last_planned) );
+#endif
             }
         }
         
+        // Have them assign, returning target waypoint
+        for(int i = 0; i < num_agents; i++){
+            t_0 = timeNow();
+            agents[i].planner->assign(&agents[i].target);
+            assign_times[planner_iteration]+=float(duration(timeNow()-t_0)/num_agents);
+        }
+        need_replan = false;
+        iter_last_planned = physics_iteration;
+        planner_iteration++;
+        printf("Planner iter: %d. Physics itr: %d. ILP: %d =>", planner_iteration, physics_iteration, iter_last_planned);
+//        if(!spin())
+//            return;
+//        printf("Planner iter: %d. Physics itr: %d. ILP: %d\n", planner_iteration, physics_iteration, iter_last_planned);
         
-#ifdef SIM_DEBUG
-        printf("Saving datafiles\n");
-#endif
-        
+        // Store planning time data
         FILE* datafile = fopen("timing.jl", "w");
         if(f == nullptr){
             printf("Error: File pointer is bad\n");
         }else{
-            save_julia_var(datafile, std::string("avg_cluster_times"), cluster_times, iteration);
-            save_julia_var(datafile, std::string("avg_compute_times"), compute_times, iteration);
-            save_julia_var(datafile, std::string("avg_assign_times"), assign_times, iteration);
-            save_julia_var(datafile, std::string("num_targets"), num_targets, iteration);
+            save_julia_var(datafile, std::string("avg_cluster_times"), cluster_times, planner_iteration);
+            save_julia_var(datafile, std::string("avg_compute_times"), compute_times, planner_iteration);
+            save_julia_var(datafile, std::string("avg_assign_times"), assign_times, planner_iteration);
+            save_julia_var(datafile, std::string("num_targets"), num_targets, planner_iteration);
         }
         fclose(datafile);
         
-#ifdef SIM_DEBUG
-        printf("Moving agents\n");
-        for(int i = 0; i < num_agents; i++){
-            printf("Agent %d going to (%f,%f,%f)\n", i, agents[i].target.x,agents[i].target.y,agents[i].target.z);
-        }
-#endif
-        
-        
-        // Here we save the data to the datafile:
-        char filename[50];
-        for(int i = 0; i < num_agents; i++){
-            true_location_buffer[i].x = agents[i].location.x;
-            true_location_buffer[i].y = agents[i].location.y;
-            true_location_buffer[i].z = agents[i].location.z;
-            agent_targets_buffer[i].x = agents[i].target.x;
-            agent_targets_buffer[i].y = agents[i].target.y;
-            agent_targets_buffer[i].z = agents[i].target.z;
-        }
-#ifdef SIM_DEBUG
-        printf("Saving frame data (%d)\n",iteration);
-#endif
-        sprintf(filename, "frame%d.jl",iteration);
-        datafile = fopen(filename, "w");
-        if(datafile==nullptr){
-            printf("Error: opened null file\n");
-        }else{
-            save_julia_var(datafile, std::string("locations"),true_location_buffer , num_agents);
-            save_julia_var(datafile, std::string("targets"),agent_targets_buffer, num_agents);
-            
-           for(int i = 0; i < num_agents; i++){
-               sprintf(filename, "trajectory_%d", i);
-                save_julia_var(datafile, std::string(filename), agents[i].planner->current_plan, int(agents[i].planner->curr_segs), &true_map);
-            }
-            
-           
-            if(iteration%plot_delay == 0){
-                // Copy global map data
-/*                for(int i = 0; i < plot_map.X_dim*plot_map.Y_dim; i++){
-                    plot_map.data[i] = true_map;//global_map.data[i];
-                }
-                
-                // Mark where current trajectory is supposed to be checked:
-                for(int i = 0; i < num_agents; i++){
-                    if(agents[i].planner != NULL){
-                        for(int seg = 1; seg <= agents[i].planner->curr_segs; seg++){
-                            
-                            for(int cell = 0; cell < agents[i].planner->current_plan[seg].num_cells; cell++)
-                                plot_map.data[agents[i].planner->current_plan[seg].cells[cell]] = MAP_FREE;
-                        }
-                    }
-                }
-  */
-                save_julia_var(datafile, std::string("global_map"), &global_map);
-            }
-        }
-        fclose(datafile);
-
-        sprintf(filename, "frame%d",iteration);
-        datafile = fopen("make_video.jl","a");
-        if(datafile==nullptr){
-            
-        }else{
-            print_video_file(datafile, filename, (float)iteration*delta_time);
-        }
-        fclose(datafile);
-        
-        datafile = fopen("pos_vel_acc_traces.jl","w");
-        if(datafile==nullptr){
-            
-        }else{
-            for(int i = 0; i < num_agents; i++){
-                sprintf(filename, "position_%d",i);
-                save_julia_var(datafile, filename, position_values[i], iteration);
-                sprintf(filename, "velocity_%d",i);
-                save_julia_var(datafile, filename, velocity_values[i], iteration);
-                sprintf(filename, "acceleration_%d",i);
-                save_julia_var(datafile, filename, acceleration_values[i], iteration);
-            }
-        }
-        
-        // Send agents toward their target destination:
-        for(int i = 0; i < num_agents; i++)
-            move_base(i, 1+iteration%replan_delay);
         
         if(done){
             printf("Exploration complete!\n");
@@ -489,12 +345,101 @@ void Simulator::run_simulator(int iters, int team_size){
 }
 
 
-void Simulator::move_base(int agent, int step){
-    // Move according to integrated velocity and acceleration
-//    agents[agent].location.x += (agents[agent].planner->current_vel.x)*delta_time + 0.5*(agents[agent].planner->current_acc.x)*(delta_time*delta_time);
-//    agents[agent].location.y += (agents[agent].planner->current_vel.y)*delta_time + 0.5*(agents[agent].planner->current_acc.y)*(delta_time*delta_time);
+bool Simulator::spin(){
+
+    // Move base
+    for (int i = 0; i < num_agents; i++){
+        move_base(i);
+    }
     
-    float poly_time = delta_time*step;
+    // Save data
+    char filename[50];
+    FILE* datafile;
+
+    Point true_location_buffer[num_agents];
+    Point agent_targets_buffer[num_agents];
+    
+    for(int i = 0; i < num_agents; i++){
+        Point tmp;
+        
+        position_values[i][physics_iteration].x = agents[i].location.x;
+        position_values[i][physics_iteration].y = agents[i].location.y;
+        position_values[i][physics_iteration].z = agents[i].location.z;
+        
+        agents[i].planner->get_vel(&tmp);
+        velocity_values[i][physics_iteration].x = tmp.x;
+        velocity_values[i][physics_iteration].y = tmp.y;
+        velocity_values[i][physics_iteration].z = tmp.z;
+        
+        agents[i].planner->get_acc(&tmp);
+        acceleration_values[i][physics_iteration].x = tmp.x;
+        acceleration_values[i][physics_iteration].y = tmp.y;
+        acceleration_values[i][physics_iteration].z = tmp.z;
+    }
+
+    for(int i = 0; i < num_agents; i++){
+        true_location_buffer[i].x = agents[i].location.x;
+        true_location_buffer[i].y = agents[i].location.y;
+        true_location_buffer[i].z = agents[i].location.z;
+        agent_targets_buffer[i].x = agents[i].target.x;
+        agent_targets_buffer[i].y = agents[i].target.y;
+        agent_targets_buffer[i].z = agents[i].target.z;
+    }
+#ifdef SIM_DEBUG
+    printf("Saving frame data (%d)\n",physics_iteration);
+#endif
+    sprintf(filename, "frame%d.jl",physics_iteration);
+    datafile = fopen(filename, "w");
+    if(datafile==nullptr){
+        printf("Error: opened null file\n");
+    }else{
+        save_julia_var(datafile, std::string("locations"),true_location_buffer , num_agents);
+        save_julia_var(datafile, std::string("targets"),agent_targets_buffer, num_agents);
+        
+        for(int i = 0; i < num_agents; i++){
+            sprintf(filename, "trajectory_%d", i);
+            save_julia_var(datafile, std::string(filename), agents[i].planner->current_plan, int(agents[i].planner->curr_segs), &true_map);
+        }
+        
+        
+        if(physics_iteration%plot_delay == 0){
+            save_julia_var(datafile, std::string("global_map"), &global_map);
+        }
+    }
+    fclose(datafile);
+    
+    sprintf(filename, "frame%d",physics_iteration);
+    datafile = fopen("make_video.jl","a");
+    if(datafile==nullptr){
+        
+    }else{
+        print_video_file(datafile, filename, (float)physics_iteration*delta_time);
+    }
+    fclose(datafile);
+    datafile = fopen("pos_vel_acc_traces.jl","w");
+    if(datafile==nullptr){
+        
+    }else{
+        for(int i = 0; i < num_agents; i++){
+            sprintf(filename, "position_%d",i);
+            save_julia_var(datafile, filename, position_values[i], physics_iteration);
+            sprintf(filename, "velocity_%d",i);
+            save_julia_var(datafile, filename, velocity_values[i], physics_iteration);
+            sprintf(filename, "acceleration_%d",i);
+            save_julia_var(datafile, filename, acceleration_values[i], physics_iteration);
+        }
+    }
+    
+    // Advance clock
+    physics_iteration+=1;
+    return (physics_iteration < max_iters);
+}
+
+
+void Simulator::move_base(int agent){
+    
+    float poly_time = path_scaling*delta_time*float(physics_iteration-iter_last_planned);
+//    printf("((%f) (%f)) ((%d)-(%d)) =  (%f)(%f) =  %f \n",path_scaling,delta_time,physics_iteration,iter_last_planned,path_scaling*delta_time, float(physics_iteration-iter_last_planned), poly_time);
     int rs=1;
     while(poly_time > agents[agent].planner->current_plan[rs].duration){
         poly_time -= agents[agent].planner->current_plan[rs].duration;
@@ -505,18 +450,27 @@ void Simulator::move_base(int agent, int step){
             break;
         }
     }
-    printf("Moving to t=%f of segment %d, which has duration %f\n", poly_time, rs, agents[agent].planner->current_plan[rs].duration);
-    
-    // I'm impatient...
-//    poly_time = (agents[agent].planner->current_plan[rs]).duration/2.0;
-    
-    // Move according to ideal path following:
-    get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].location), 0);
-    get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].planner->current_vel), 1);
-    get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].planner->current_acc), 2);
 
-    agents[agent].bearing = atan2f(agents[agent].planner->current_vel.y, agents[agent].planner->current_vel.x);
+    printf("Moving to t=%f of segment %d, which has duration %f. ", poly_time, rs, agents[agent].planner->current_plan[rs].duration);
+    printf(" Old position: (%f,%f,%f). ", agents[agent].location.x, agents[agent].location.y, agents[agent].location.z);
+    // If no more polynomial, then keep going.
     
+    if(poly_time < agents[agent].planner->current_plan[rs].duration && agents[agent].planner->current_plan[rs].duration >0){
+        // Move according to ideal path following:
+        get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].location), 0);
+        get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].planner->current_vel), 1);
+        get_poly_der((agents[agent].planner->current_plan[rs]), poly_time, &(agents[agent].planner->current_acc), 2);
+        agents[agent].bearing = atan2f(agents[agent].planner->current_vel.y, agents[agent].planner->current_vel.x);
+    }else{
+        // Keep going the way you are going, maybe slow to a stop?
+        printf("WARNING: Agent %d drifting (no valid plan left)\n", agent);
+        need_replan = true;
+        // Move according to integrated velocity and acceleration
+        agents[agent].location.x += (agents[agent].planner->current_vel.x)*delta_time + 0.5*(agents[agent].planner->current_acc.x)*(delta_time*delta_time);
+        agents[agent].location.y += (agents[agent].planner->current_vel.y)*delta_time + 0.5*(agents[agent].planner->current_acc.y)*(delta_time*delta_time);
+    }
+    printf("New position: (%f,%f,%f).\n", agents[agent].location.x, agents[agent].location.y, agents[agent].location.z);
+
 }
 
 

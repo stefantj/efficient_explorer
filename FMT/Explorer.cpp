@@ -181,28 +181,32 @@ void Explorer::assign(Point* waypoint){
         int target_assignments[team_size];
         for(int i =0; i < team_size; i++)
             target_assignments[i]=0;
+        
+        if(team_size > 1){
+            std::vector<std::vector<double>> tmp_costs (team_size, std::vector<double>( num_goals, 0));
+            for(int agent = 0; agent < team_size; agent++){
+                for(int goal =0; goal< num_goals; goal++){
+                    tmp_costs[agent][goal] = goal_costs[agent][goal];
+                }
+            }
+    #ifdef EXPLORE_DEBUG
+            printf("Agent %d cost matrix:\n",self_id);
+            for(int i = 0; i < team_size; i++){
+                printf("%d : ",i);
+                for(int j=0; j <num_goals; j++){
+                    printf(" %2.2f ", goal_costs[i][j]);
+                }
+                printf("\n");
+            }
+            
+    #endif
+            
+            assign_min(tmp_costs, target_assignments, team_size);
 
-        // Want to change this so that goal_costs is a vector<vector<double>> or change hungarian code.
-        std::vector<std::vector<double>> tmp_costs (team_size, std::vector<double>( num_goals, 0));
-        for(int agent = 0; agent < team_size; agent++){
-            for(int goal =0; goal< num_goals; goal++){
-                tmp_costs[agent][goal] = goal_costs[agent][goal];
+                
             }
-        }
-#ifdef EXPLORE_DEBUG
-        printf("Agent %d cost matrix:\n",self_id);
-        for(int i = 0; i < team_size; i++){
-            printf("%d : ",i);
-            for(int j=0; j <num_goals; j++){
-                printf(" %2.2f ", goal_costs[i][j]);
-            }
-            printf("\n");
-        }
         
-#endif
-        
-        assign_min(tmp_costs, target_assignments, team_size);
-        if(target_assignments[self_id] >= num_goals){
+        if(team_size == 1 || target_assignments[self_id] >= num_goals){
             planner_status = PLANNER_DEFAULT;
             // Go to minimum:
             float mincost = goal_costs[self_id][0];
@@ -231,7 +235,10 @@ void Explorer::assign(Point* waypoint){
         printf("Agent %d assigned to (%f,%f)\n", self_id, goal_pt.x,goal_pt.y);
 #endif
         
-        // Always replan. TODO: Fix this
+        // Always replan.
+        F_sparse->set_initial_state(&current_vel, &current_acc);
+        F_dense->set_initial_state(&current_vel, &current_acc);
+
         curr_segs = F_sparse->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
         if(current_plan[0].cost == -1){
             curr_segs = F_dense->fmtstar(swarm_locs[self_id], goal_pt, &exploration_map, current_plan);
@@ -280,61 +287,7 @@ void Explorer::assign(Point* waypoint){
         }
         
         get_poly_der(current_plan[curr_segs], current_plan[curr_segs].duration, waypoint, 0);
-        
-        // Update velocity.
-        // This should be an acceleration controlled system.
-        float dt = 0.1;
-        
-        get_poly_der(current_plan[1], dt, &current_acc, 2);
-        get_poly_der(current_plan[1], dt, &current_vel, 1);
 
-        
-/*
-        if(current_vel.x != current_vel.x || current_vel.y != current_vel.y || current_vel.z != current_vel.z)
-        {
-//            vel.x = 0.0; vel.y = 0.0; vel.z = 0.0;
-//            acc.x = 0.0; acc.y = 0.0; acc.z = 0.0;
-
-        }else{
-            
-            // Compute the value of acceleration/velocity based on ideal physics:
-            // v(t+dt) = v(t) + a(t) dt
-            
-            
-            
-            current_acc.x = sign(current_acc.x)*fmin(fabs(current_acc.x), MAX_ACCEL_X* (1296.0/25.0));
-            current_acc.y = sign(current_acc.y)*fmin(fabs(current_acc.y), MAX_ACCEL_Y* (1296.0/25.0));
-
-//            current_vel.x += current_acc.x*dt;
-//            current_vel.y += current_acc.y*dt;
-            current_vel.x = sign(current_vel.x)*fminf(fabs(current_vel.x), MAX_VEL_X*36.0/5.0);
-            current_vel.y = sign(current_vel.y)*fminf(fabs(current_vel.y), MAX_VEL_X*36.0/5.0);
-            
-//            current_vel.z += fmax(current_acc.x, MAX_ACCEL_Z*sign(current_acc.x))*dt;
-
-            
-        }
-*/
-        
-        
-#ifdef EXPLORE_DEBUG
-
-        print_call_rates();
-        if(self_id >= 0){
-            printf("Pos%d = (%f,%f,%f)\n",self_id, swarm_locs[self_id].x,swarm_locs[self_id].y,swarm_locs[self_id].z);
-            printf("V%d = %f\n",self_id, norm(current_vel)*5.0/36.0);
-            printf("A%d = %f\n",self_id, norm(current_acc)*25.0/(1296.0));
-        }
-        
-        
-
-        
-        printf("Current plan uses %d paths of %d allocated. Each path has size %ld, meaning %f space is wasted\n", curr_segs, F_DENSE_PTS+2,  sizeof(current_plan[0]), float( sizeof(current_plan[0]))*(F_DENSE_PTS+2-curr_segs));
-        
-        printf("Size of small FMT planner: %ld. Size of large FMT planner: %ld\n", sizeof(F_sparse), sizeof(&F_dense));
-        
-        printf("Agent %d traveling to (%f,%f)\n", self_id, waypoint->x, waypoint->y);
-#endif
     
 #ifdef EXPLORE_STATUS
     if(planner_status == PLANNER_NOMINAL){

@@ -37,8 +37,11 @@ public:
     void run_simulator(int iters, int team_size);
     
 private:
+    // Advances robots along their paths, increments the physics clock, and stores position information.
+    bool spin();
+    
     void raytrace(int agent);
-    void move_base(int agent, int step);
+    void move_base(int agent);
     
     void init_video_file(FILE* f);
     void print_video_file(FILE* f, std::string filename, float time);
@@ -54,9 +57,19 @@ private:
     Agent agents[MAX_NUM_AGENTS]; // List of agents
     
     float delta_time;
+    float path_scaling;
+    int iter_last_planned;
+    float min_replan_period;
     int plot_delay;
-    int replan_delay;
     int num_agents;
+    int physics_iteration;
+    int max_iters;
+    bool need_replan;
+    
+    Point* position_values[MAX_NUM_AGENTS];
+    Point* velocity_values[MAX_NUM_AGENTS];
+    Point* acceleration_values[MAX_NUM_AGENTS];
+    
     
     bool comms[MAX_NUM_AGENTS][MAX_NUM_AGENTS];
 };
